@@ -1,0 +1,16 @@
+spring:
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://localhost:5432/booksharing
+    username: postgres
+    password: 1202
+
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: update
+
+jwt:
+  secret: my-super-super-super-secret-key-1234567890
+  expiration: 3600000
+
