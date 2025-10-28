@@ -1,15 +1,25 @@
 package org.example.booksharing.contoller;
 
-import org.example.booksharing.entities.User;
-import org.example.booksharing.repository.UserRepository;
-import org.example.booksharing.repository.BookRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.booksharing.entities.Book;
+import org.example.booksharing.entities.User;
+import org.example.booksharing.repository.BookRepository;
+import org.example.booksharing.repository.BookSpecification;
+import org.example.booksharing.repository.RatingRepository;
+import org.example.booksharing.repository.UserRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
-import java.util.List;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.*;
+import java.util.*;
 
 @RestController
 @RequestMapping("/books")
@@ -17,55 +27,102 @@ public class BookController {
 
     private final BookRepository bookRepository;
     private final UserRepository userRepository;
+    private final RatingRepository ratingRepository;
 
+    private static final String UPLOAD_DIR = System.getProperty("user.dir") + "/uploads";
+
+    @Autowired
     public BookController(BookRepository bookRepository,
-                          UserRepository userRepository) {
+                          UserRepository userRepository,
+                          RatingRepository ratingRepository) {
         this.bookRepository = bookRepository;
         this.userRepository = userRepository;
+        this.ratingRepository = ratingRepository;
+    }
+
+    private Book enrichBook(Book book) {
+        if (book == null) return null;
+
+        Double avg = ratingRepository.avgScoreByBookId(book.getId());
+        book.setRating(avg != null ? avg : 0.0);
+
+        Long likes = (long) (book.getLikedUsers() != null ? book.getLikedUsers().size() : 0);
+        book.setLikesCount(likes);
+
+        if (book.getLikedUsers() == null) {
+            book.setLikedUsers(new ArrayList<>());
+        }
+        if (book.getFileUrl() == null) {
+            book.setFileUrl("");
+        }
+        if (book.getImageUrl() == null) {
+            book.setImageUrl("");
+        }
+
+        return book;
+    }
+
+
+
+    private List<Book> enrichBooks(List<Book> books) {
+        return books.stream().map(this::enrichBook).toList();
     }
 
     @GetMapping
-    public List<Book> getAllBooks() {
-        return bookRepository.findAll();
+    public List<Book> getBooks(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) Double rating,
+            @RequestParam(required = false) String tag
+    ) {
+        List<Book> books;
+        if (search != null && !search.isEmpty()) books = bookRepository.search(search);
+        else if (rating != null) books = bookRepository.findByRating(rating);
+        else if (tag != null && !tag.isEmpty()) books = bookRepository.findByTag(tag);
+        else books = bookRepository.findAll();
+
+        return enrichBooks(books);
+    }
+
+    @PostMapping(consumes = {"multipart/form-data"})
+    public ResponseEntity<String> addBook(
+            @RequestPart("book") String bookJson,
+            @RequestPart(value = "file", required = false) MultipartFile file
+    ) throws IOException {
+
+        ObjectMapper mapper = new ObjectMapper();
+        Book book = mapper.readValue(bookJson, Book.class);
+
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        String username = auth.getName();
+        User user = userRepository.findByUsername(username).orElseThrow();
+
+        if (file != null && !file.isEmpty()) {
+            if (file.getSize() > 5 * 1024 * 1024)
+                return ResponseEntity.badRequest().body("File too large (max 5MB)");
+
+            String contentType = file.getContentType();
+            if (!List.of("image/jpeg", "image/png", "application/pdf").contains(contentType))
+                return ResponseEntity.badRequest().body("Invalid file type");
+
+            Files.createDirectories(Paths.get(UPLOAD_DIR));
+            String fileName = UUID.randomUUID() + "_" + file.getOriginalFilename();
+            Path filePath = Paths.get(UPLOAD_DIR, fileName);
+            file.transferTo(filePath.toFile());
+
+            String fileUrl = "/uploads/" + fileName;
+            if (contentType.startsWith("image")) book.setImageUrl(fileUrl);
+            else book.setFileUrl(fileUrl);
+        }
+
+        book.setUser(user);
+        bookRepository.save(book);
+        return ResponseEntity.ok("Book added successfully");
     }
 
     @GetMapping("/{id}")
-    public Book getBookById(@PathVariable Long id) {
-        return bookRepository.findById(id).orElseThrow();
-    }
-
-    @PostMapping
-    public ResponseEntity<String> addBook(@RequestBody Book book) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        String username = auth.getName();
-
-        User user = userRepository.findByUsername(username).orElseThrow();
-        book.setUser(user);
-        bookRepository.save(book);
-
-        return ResponseEntity.ok("Book added by " + username);
-    }
-
-
-    @PutMapping("/{id}")
-    public Book updateBook(@PathVariable Long id, @RequestBody Book updatedBook) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        String username = auth.getName();
-        User user = userRepository.findByUsername(username).orElseThrow();
-
-        return bookRepository.findById(id)
-                .map(book -> {
-                    if (!book.getUser().getId().equals(user.getId())) {
-                        throw new RuntimeException("You cannot edit someone else's book");
-                    }
-                    book.setTitle(updatedBook.getTitle());
-                    book.setAuthor(updatedBook.getAuthor());
-                    book.setYear(updatedBook.getYear());
-                    book.setDescription(updatedBook.getDescription());
-                    book.setQrCode(updatedBook.getQrCode());
-                    return bookRepository.save(book);
-                })
-                .orElseThrow(() -> new RuntimeException("Book not found: " + id));
+    public ResponseEntity<Book> getBookById(@PathVariable Long id) {
+        Book book = bookRepository.findById(id).orElseThrow();
+        return ResponseEntity.ok(enrichBook(book));
     }
 
     @DeleteMapping("/{id}")
@@ -78,7 +135,51 @@ public class BookController {
         if (!book.getUser().getId().equals(user.getId())) {
             throw new RuntimeException("You cannot delete someone else's book");
         }
+
+        if (book.getFileUrl() != null && !book.getFileUrl().isEmpty()) {
+            Path filePath = Paths.get(UPLOAD_DIR, new File(book.getFileUrl()).getName());
+            try { Files.deleteIfExists(filePath); } catch (IOException ignored) {}
+        }
+
         bookRepository.deleteById(id);
         return ResponseEntity.ok("Book deleted");
+    }
+
+    @PostMapping("/{id}/like")
+    public ResponseEntity<?> toggleLike(@PathVariable Long id, Authentication authentication) {
+        String username = authentication.getName();
+        User user = userRepository.findByUsername(username).orElseThrow();
+        Book book = bookRepository.findById(id).orElseThrow();
+
+        if (book.getLikedUsers().contains(user)) {
+            book.getLikedUsers().remove(user);
+        } else {
+            book.getLikedUsers().add(user);
+        }
+
+        book.setLikesCount((long) book.getLikedUsers().size());
+
+        bookRepository.save(book);
+
+        return ResponseEntity.ok(enrichBook(book));
+    }
+
+
+
+    @GetMapping("/favorites")
+    public ResponseEntity<List<Book>> getFavorites() {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        List<Book> favorites = bookRepository.findFavoritesByUsername(username);
+        return ResponseEntity.ok(enrichBooks(favorites));
+    }
+
+    @GetMapping("/search")
+    public Page<Book> searchBooks(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String author,
+            @RequestParam(required = false) Integer ratingMin,
+            @RequestParam(required = false) Integer ratingMax,
+            Pageable pageable) {
+        return bookRepository.findAll(BookSpecification.filter(search, author, ratingMin, ratingMax), pageable);
     }
 }

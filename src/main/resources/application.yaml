@@ -10,7 +10,11 @@ spring:
     hibernate:
       ddl-auto: update
 
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+
 jwt:
   secret: my-super-super-super-secret-key-1234567890
   expiration: 3600000
-
