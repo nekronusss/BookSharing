@@ -72,16 +72,26 @@ public class BookController {
     public List<Book> getBooks(
             @RequestParam(required = false) String search,
             @RequestParam(required = false) Double rating,
-            @RequestParam(required = false) String tag
+            @RequestParam(required = false) String tag,
+            @RequestParam(required = false) String category
     ) {
         List<Book> books;
-        if (search != null && !search.isEmpty()) books = bookRepository.search(search);
-        else if (rating != null) books = bookRepository.findByRating(rating);
-        else if (tag != null && !tag.isEmpty()) books = bookRepository.findByTag(tag);
-        else books = bookRepository.findAll();
+
+        if (search != null && !search.isEmpty()) {
+            books = bookRepository.search(search);
+        } else if (rating != null) {
+            books = bookRepository.findByRating(rating);
+        } else if (tag != null && !tag.isEmpty()) {
+            books = bookRepository.findByTag(tag);
+        } else if (category != null && !category.isEmpty()) {
+            books = bookRepository.findByCategory(category);
+        } else {
+            books = bookRepository.findAll();
+        }
 
         return enrichBooks(books);
     }
+
 
     @PostMapping(consumes = {"multipart/form-data"})
     public ResponseEntity<String> addBook(
@@ -179,7 +189,14 @@ public class BookController {
             @RequestParam(required = false) String author,
             @RequestParam(required = false) Integer ratingMin,
             @RequestParam(required = false) Integer ratingMax,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String tag,
             Pageable pageable) {
-        return bookRepository.findAll(BookSpecification.filter(search, author, ratingMin, ratingMax), pageable);
+
+        return bookRepository.findAll(
+                BookSpecification.filter(search, author, ratingMin, ratingMax, category, tag),
+                pageable
+        );
     }
+
 }

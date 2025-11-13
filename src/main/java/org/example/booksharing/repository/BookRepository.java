@@ -9,6 +9,8 @@ import org.springframework.data.repository.query.Param;
 import java.util.List;
 
 public interface BookRepository extends JpaRepository<Book, Long>, JpaSpecificationExecutor<Book> {
+    @Query("SELECT b FROM Book b WHERE LOWER(b.category) = LOWER(:category)")
+    List<Book> findByCategory(@Param("category") String category);
 
     @Query("SELECT b FROM Book b WHERE " +
             "LOWER(b.title) LIKE LOWER(CONCAT('%', :search, '%')) " +

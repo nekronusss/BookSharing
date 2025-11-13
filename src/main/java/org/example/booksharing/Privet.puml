@@ -1,0 +1,399 @@
+@startuml
+' BookSharing — Class Diagram (entities, repos, services, controllers, security, config)
+' Use in PlantUML renderer: https://plantuml.com
+
+skinparam classAttributeIconSize 0
+hide empty members
+
+package "entities" {
+    class User {
+        - Long id
+        - String username
+        - String password
+        - String displayName
+        - String email
+        - boolean privateProfile
+        - boolean privateBooks
+        - String avatarUrl
+        - List<Book> books
+        - List<Comment> comments
+        + isPrivateProfile(): boolean
+        + setPrivateProfile(boolean): void
+        + isPrivateBooks(): boolean
+        + setPrivateBooks(boolean): void
+    }
+
+    class Book {
+        - Long id
+        - String title
+        - String author
+        - int year
+        - String description
+        - LocalDate addedDate
+        - String qrCode
+        - Double rating
+        - List<String> tags
+        - String fileUrl
+        - String imageUrl
+        - Boolean isPublic
+        - Long likesCount
+        - String category
+        - User user
+        + getId(): Long
+        + setRating(Double): void
+    }
+
+    class Comment {
+        - Long id
+        - String text
+        - LocalDateTime createdAt
+        - User author
+        - Book book
+        + prePersist(): void
+    }
+
+    class Rating {
+        - Long id
+        - Integer score
+        - Boolean liked
+        - User user
+        - Book book
+    }
+
+    class Notification {
+        - Long id
+        - Long userId
+        - String type
+        - String message
+        - boolean isRead
+        - LocalDateTime createdAt
+    }
+
+    class BookImage {
+        - Long id
+        - String filePath
+        - boolean isPublic
+        - Book book
+    }
+
+    class ListItem {
+        - Long id
+        - UserList userList
+        - Book book
+        - LocalDateTime addedAt
+        + prePersist(): void
+    }
+
+    class UserList {
+        - Long id
+        - String name
+        - User owner
+        - List<ListItem> items
+        - LocalDateTime createdAt
+        + prePersist(): void
+    }
+
+    class ActionHistory {
+        - Long id
+        - Long userId
+        - String actionType
+        - String entityType
+        - Long entityId
+        - String details
+        - String action
+        - LocalDateTime timestamp
+        - LocalDateTime createdAt
+        + prePersist(): void
+    }
+}
+
+package "repositories" {
+    interface BookRepository <<interface>> {
+        + List<Book> search(String search)
+        + List<Book> findByRating(Double rating)
+        + List<Book> findByTag(String tag)
+        + List<Book> findFavoritesByUsername(String username)
+        + Double getAverageRating()
+        + List<Object[]> countBooksByCategory()
+    }
+
+    interface UserRepository <<interface>> {
+        + Optional<User> findByUsername(String username)
+        + List<Object[]> findTopUsers()
+        + List<Object[]> findMostActiveUsers()
+    }
+
+    interface CommentRepository <<interface>> {
+        + List<Comment> findByBookIdOrderByCreatedAtAsc(Long bookId)
+    }
+
+    interface RatingRepository <<interface>> {
+        + Optional<Rating> findByUserIdAndBookId(Long userId, Long bookId)
+        + Long countLikesByBookId(Long bookId)
+        + Double avgScoreByBookId(Long bookId)
+    }
+
+    interface NotificationRepository <<interface>> {
+        + List<Notification> findByUserIdOrderByCreatedAtDesc(Long userId)
+        + List<Notification> findByUserIdAndReadFalse(Long userId)
+    }
+
+    interface ListItemRepository <<interface>> {
+        + boolean existsByUserListIdAndBookId(Long userListId, Long bookId)
+        + List<ListItem> findByUserListId(Long userListId)
+    }
+
+    interface UserListRepository <<interface>> {
+        + List<UserList> findByOwnerId(Long ownerId)
+    }
+
+    interface ActionHistoryRepository <<interface>> {
+        + List<ActionHistory> findByUserIdOrderByTimestampDesc(Long userId)
+        + List<ActionHistory> findByUserIdOrderByCreatedAtDesc(Long userId)
+    }
+}
+
+package "services" {
+    class CommentService {
+        - CommentRepository commentRepo
+        - BookRepository bookRepo
+        - UserRepository userRepo
+        - ActionHistoryRepository historyRepo
+        - NotificationRepository notificationRepo
+        + addComment(Long bookId, String text, String username): Comment
+        + getComments(Long bookId): List<Comment>
+        + deleteComment(Long commentId, String username): void
+    }
+
+    class RatingService {
+        - RatingRepository ratingRepo
+        - BookRepository bookRepo
+        - UserRepository userRepo
+        - ActionHistoryRepository historyRepo
+        + addOrUpdate(Long bookId, Integer score, Boolean liked, String username): Rating
+        + getLikes(Long bookId): Long
+        + getAvg(Long bookId): Double
+        + removeRating(Long bookId, String username): void
+    }
+
+    class UserService {
+        - UserRepository userRepository
+        - ActionHistoryRepository historyRepository
+        + updateProfile(Long userId, String displayName, String email, MultipartFile avatar): User
+    }
+
+    class UserListService {
+        - UserListRepository listRepo
+        - ListItemRepository itemRepo
+        - UserRepository userRepo
+        - BookRepository bookRepo
+        - ActionHistoryRepository historyRepo
+        + createList(Long ownerId, String name): UserList
+        + addItem(Long listId, Long bookId, Long requesterId): ListItem
+        + getItems(Long listId, Long requesterId): List<ListItem>
+    }
+
+    class ImageService {
+        + uploadImages(Long bookId, MultipartFile[] files): List<String>
+    }
+
+    class ExternalBookService {
+        - WebClient webClient
+        + searchBooks(String query): JsonNode
+    }
+
+    class HistoryService {
+        - ActionHistoryRepository repo
+        + getUserHistory(Long userId): List<ActionHistory>
+    }
+}
+
+package "controllers" {
+    class AuthController {
+        - UserRepository userRepository
+        - PasswordEncoder passwordEncoder
+        - JwtUtil jwtUtil
+        - AuthenticationManager authenticationManager
+        + register(AuthRequest): ResponseEntity
+        + login(AuthRequest): ResponseEntity
+    }
+
+    class BookController {
+        - BookRepository bookRepository
+        - UserRepository userRepository
+        - RatingRepository ratingRepository
+        + getBooks(String search, Double rating, String tag): List<Book>
+        + addBook(String bookJson, MultipartFile file): ResponseEntity<String>
+        + getBookById(Long id): ResponseEntity<Book>
+        + deleteBook(Long id): ResponseEntity<String>
+        + toggleLike(Long id, Authentication authentication): ResponseEntity
+        + getFavorites(): ResponseEntity<List<Book>>
+        + searchBooks(..., Pageable): Page<Book>
+    }
+
+    class CommentController {
+        - CommentService commentService
+        + add(Long bookId, Map body): ResponseEntity<Comment>
+        + list(Long bookId): ResponseEntity<List<Comment>>
+        + delete(Long commentId): ResponseEntity<String>
+    }
+
+    class RatingController {
+        - RatingService ratingService
+        + rate(Long id, Map body): ResponseEntity<Rating>
+        + stats(Long id): ResponseEntity<Map<String,Object>>
+        + remove(Long id): ResponseEntity<String>
+    }
+
+    class NotificationController {
+        - NotificationRepository repo
+        + getUserNotifications(Long userId): List<Notification>
+        + markAsRead(List<Long> ids): void
+    }
+
+    class ProfileController {
+        - UserService userService
+        - UserRepository userRepository
+        + updateProfile(Long id, String profileJson, MultipartFile avatar): ResponseEntity<User>
+    }
+
+    class ExternalBookController {
+        - ExternalBookService externalBookService
+        + searchExternal(String query): ResponseEntity<JsonNode>
+    }
+
+    class HistoryController {
+        - HistoryService historyService
+        + history(Long id): ResponseEntity<List<ActionHistory>>
+    }
+
+    class UserController {
+        - UserRepository userRepository
+        - ActionHistoryRepository actionHistoryRepository
+        + getHistory(Long id): List<ActionHistory>
+        + updatePrivacy(Long id, PrivacySettingsDto dto): void
+    }
+
+    class UserListController {
+        - UserListService service
+        - UserRepository userRepository
+        + createList(Long id, Map body): ResponseEntity<UserList>
+        + addToList(Long listId, Map body): ResponseEntity<ListItem>
+        + getList(Long listId): ResponseEntity<List<ListItem>>
+    }
+
+    class AnalyticsController {
+        - BookRepository bookRepository
+        - UserRepository userRepository
+        - CommentRepository commentRepository
+        + getOverview(): Map<String,Object>
+    }
+}
+
+package "security & config" {
+    class JwtUtil {
+        - SecretKey secretKey
+        - long expiration
+        + generateToken(String username): String
+        + validateToken(String token): String
+    }
+
+    class JwtAuthenticationFilter {
+        - JwtUtil jwtUtil
+        + doFilterInternal(HttpServletRequest, HttpServletResponse, FilterChain): void
+    }
+
+    class SecurityConfig {
+        - JwtAuthenticationFilter jwtFilter
+        + passwordEncoder(): PasswordEncoder
+        + authenticationManager(AuthenticationConfiguration): AuthenticationManager
+        + filterChain(HttpSecurity): SecurityFilterChain
+    }
+
+    class WebConfig {
+        + addResourceHandlers(ResourceHandlerRegistry): void
+    }
+}
+
+' ---------- Relationships (associations, multiplicities, dependencies) ----------
+' Entities associations
+User "1" o-- "*" Book : "owns / books"
+Book "1" -- "*" Comment : "has"
+Book "1" -- "*" Rating : "has"
+Book "1" *-- "*" BookImage : "images (composition)"
+User "1" -- "*" Comment : "author of"
+User "1" -- "*" Rating : "gives"
+User "1" -- "*" Notification : "receives"
+User "1" -- "*" ActionHistory : "has history"
+User "1" o-- "*" UserList : "owns lists"
+UserList "1" -- "*" ListItem : "contains"
+ListItem "*" -- "1" Book : "refers to"
+
+' repositories realize entities (data access) - dependency arrows
+BookRepository ..> Book : "manages"
+UserRepository ..> User
+CommentRepository ..> Comment
+RatingRepository ..> Rating
+NotificationRepository ..> Notification
+ListItemRepository ..> ListItem
+UserListRepository ..> UserList
+ActionHistoryRepository ..> ActionHistory
+
+' services use repositories
+CommentService ..> CommentRepository
+CommentService ..> BookRepository
+CommentService ..> UserRepository
+CommentService ..> ActionHistoryRepository
+CommentService ..> NotificationRepository
+
+RatingService ..> RatingRepository
+RatingService ..> BookRepository
+RatingService ..> UserRepository
+RatingService ..> ActionHistoryRepository
+
+UserService ..> UserRepository
+UserService ..> ActionHistoryRepository
+
+UserListService ..> UserListRepository
+UserListService ..> ListItemRepository
+UserListService ..> UserRepository
+UserListService ..> BookRepository
+UserListService ..> ActionHistoryRepository
+
+ImageService ..> "file system"
+ExternalBookService ..> WebClient
+
+HistoryService ..> ActionHistoryRepository
+
+' controllers depend on services/repositories
+AuthController ..> UserRepository
+AuthController ..> JwtUtil
+
+BookController ..> BookRepository
+BookController ..> UserRepository
+BookController ..> RatingRepository
+
+CommentController ..> CommentService
+RatingController ..> RatingService
+ProfileController ..> UserService
+UserListController ..> UserListService
+NotificationController ..> NotificationRepository
+ExternalBookController ..> ExternalBookService
+HistoryController ..> HistoryService
+UserController ..> UserRepository
+AnalyticsController ..> BookRepository
+AnalyticsController ..> UserRepository
+AnalyticsController ..> CommentRepository
+
+' security wiring
+JwtAuthenticationFilter ..> JwtUtil
+SecurityConfig ..> JwtAuthenticationFilter
+
+' config
+WebConfig ..> "static uploads" : "exposes /uploads/**"
+
+' Stereotypes / notes
+note right of Book : entity table 'book'
+note left of User : entity table 'users'
+
+@enduml
