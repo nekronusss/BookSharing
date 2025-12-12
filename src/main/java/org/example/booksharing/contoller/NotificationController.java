@@ -18,6 +18,7 @@ public class NotificationController {
         return repo.findByUserIdOrderByCreatedAtDesc(userId);
     }
 
+
     @PostMapping("/mark_read")
     public void markAsRead(@RequestBody List<Long> ids) {
         ids.forEach(id -> {

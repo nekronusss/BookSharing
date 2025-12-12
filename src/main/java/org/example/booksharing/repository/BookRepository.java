@@ -1,6 +1,7 @@
 package org.example.booksharing.repository;
 
 import org.example.booksharing.entities.Book;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
@@ -31,4 +32,7 @@ public interface BookRepository extends JpaRepository<Book, Long>, JpaSpecificat
 
     @Query("SELECT b.category, COUNT(b) FROM Book b GROUP BY b.category")
     List<Object[]> countBooksByCategory();
+
+    List<Book> findAll(Specification<Book> spec);
+
 }

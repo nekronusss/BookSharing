@@ -10,6 +10,7 @@ import org.example.booksharing.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -19,6 +20,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.*;
+import java.time.LocalDateTime;
 import java.util.*;
 
 @RestController
@@ -73,7 +75,9 @@ public class BookController {
             @RequestParam(required = false) String search,
             @RequestParam(required = false) Double rating,
             @RequestParam(required = false) String tag,
-            @RequestParam(required = false) String category
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) Integer viewsMin
+
     ) {
         List<Book> books;
 
@@ -132,6 +136,8 @@ public class BookController {
     @GetMapping("/{id}")
     public ResponseEntity<Book> getBookById(@PathVariable Long id) {
         Book book = bookRepository.findById(id).orElseThrow();
+        book.setActivityScore(book.getActivityScore() + 1);
+        bookRepository.save(book);
         return ResponseEntity.ok(enrichBook(book));
     }
 
@@ -191,12 +197,15 @@ public class BookController {
             @RequestParam(required = false) Integer ratingMax,
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String tag,
-            Pageable pageable) {
-
+            @RequestParam(required = false) Integer viewsMin,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime updatedAfter,
+            Pageable pageable
+    ) {
         return bookRepository.findAll(
-                BookSpecification.filter(search, author, ratingMin, ratingMax, category, tag),
+                BookSpecification.filter(search, author, ratingMin, ratingMax, category, tag, viewsMin, updatedAfter),
                 pageable
         );
     }
+
 
 }

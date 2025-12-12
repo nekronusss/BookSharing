@@ -3,7 +3,10 @@ package org.example.booksharing.entities;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
+import org.hibernate.annotations.ColumnDefault;
+
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
@@ -21,6 +24,8 @@ public class Book {
         this.category = category;
     }
 
+    private Integer activityScore = 0;
+
     private String title;
     private String author;
     private int year;
@@ -28,7 +33,36 @@ public class Book {
     private LocalDate addedDate;
     private String qrCode;
 
+    public Integer getActivityScore() {
+        return activityScore;
+    }
+
+    public void setActivityScore(Integer activityScore) {
+        this.activityScore = activityScore;
+    }
+
+    public Integer getViews() {
+        return views;
+    }
+
+    public void setViews(Integer views) {
+        this.views = views;
+    }
+
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(LocalDateTime updatedAt) {
+        this.updatedAt = updatedAt;
+    }
+
     private Double rating;
+
+    @ColumnDefault("0")
+    private Integer views = 0;
+
+    private LocalDateTime updatedAt;
 
     @ElementCollection
     private List<String> tags;

@@ -5,17 +5,21 @@ import jakarta.persistence.criteria.Predicate;
 import org.example.booksharing.entities.Book;
 import org.springframework.data.jpa.domain.Specification;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
 public class BookSpecification {
+
     public static Specification<Book> filter(
             String search,
             String author,
             Integer ratingMin,
             Integer ratingMax,
             String category,
-            String tag
+            String tag,
+            Integer viewsMin,                    // новый параметр
+            LocalDateTime updatedAfter           // новый параметр
     ) {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
@@ -33,7 +37,6 @@ public class BookSpecification {
             }
 
             if (tag != null && !tag.isEmpty()) {
-                // join для списка тегов (если tags — это List<String>)
                 Join<Object, Object> tagsJoin = root.join("tags");
                 predicates.add(cb.equal(cb.lower(tagsJoin.as(String.class)), tag.toLowerCase()));
             }
@@ -44,6 +47,15 @@ public class BookSpecification {
 
             if (ratingMax != null) {
                 predicates.add(cb.lessThanOrEqualTo(root.get("rating"), ratingMax));
+            }
+
+            // новые фильтры
+            if (viewsMin != null) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("views"), viewsMin));
+            }
+
+            if (updatedAfter != null) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("updatedAt"), updatedAfter));
             }
 
             return cb.and(predicates.toArray(new Predicate[0]));
