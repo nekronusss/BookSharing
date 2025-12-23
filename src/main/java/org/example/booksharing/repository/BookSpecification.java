@@ -18,8 +18,8 @@ public class BookSpecification {
             Integer ratingMax,
             String category,
             String tag,
-            Integer viewsMin,                    // новый параметр
-            LocalDateTime updatedAfter           // новый параметр
+            Integer viewsMin,
+            LocalDateTime updatedAfter
     ) {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
