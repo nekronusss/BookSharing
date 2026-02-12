@@ -98,7 +98,7 @@ public class BookController {
 
 
     @PostMapping(consumes = {"multipart/form-data"})
-    public ResponseEntity<String> addBook(
+    public ResponseEntity<Book> addBook(
             @RequestPart("book") String bookJson,
             @RequestPart(value = "file", required = false) MultipartFile file
     ) throws IOException {
@@ -112,11 +112,11 @@ public class BookController {
 
         if (file != null && !file.isEmpty()) {
             if (file.getSize() > 5 * 1024 * 1024)
-                return ResponseEntity.badRequest().body("File too large (max 5MB)");
+                throw new RuntimeException("File too large (max 5MB)");
 
             String contentType = file.getContentType();
             if (!List.of("image/jpeg", "image/png", "application/pdf").contains(contentType))
-                return ResponseEntity.badRequest().body("Invalid file type");
+                throw new RuntimeException("Invalid file type");
 
             Files.createDirectories(Paths.get(UPLOAD_DIR));
             String fileName = UUID.randomUUID() + "_" + file.getOriginalFilename();
@@ -129,9 +129,11 @@ public class BookController {
         }
 
         book.setUser(user);
-        bookRepository.save(book);
-        return ResponseEntity.ok("Book added successfully");
+        Book savedBook = bookRepository.save(book);
+
+        return ResponseEntity.ok(savedBook);
     }
+
 
     @GetMapping("/{id}")
     public ResponseEntity<Book> getBookById(@PathVariable Long id) {
