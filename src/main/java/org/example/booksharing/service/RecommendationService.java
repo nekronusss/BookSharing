@@ -2,7 +2,6 @@ package org.example.booksharing.service;
 
 import org.example.booksharing.entities.Book;
 import org.example.booksharing.entities.Favorite;
-import org.example.booksharing.entities.User;
 import org.example.booksharing.repository.BookRepository;
 import org.example.booksharing.repository.FavoriteRepository;
 import org.example.booksharing.repository.UserRepository;
@@ -25,7 +24,7 @@ public class RecommendationService {
     }
 
     public List<Book> getRecommendations(Long userId) {
-        User user = userRepo.findById(userId).orElseThrow();
+        userRepo.findById(userId).orElseThrow();
 
         List<Book> favorites = favRepo.findByUserId(userId).stream().map(Favorite::getBook).toList();
 

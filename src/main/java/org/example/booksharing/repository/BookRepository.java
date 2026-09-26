@@ -6,6 +6,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.lang.NonNull;
+import org.springframework.lang.Nullable;
 
 import java.util.List;
 
@@ -24,7 +26,7 @@ public interface BookRepository extends JpaRepository<Book, Long>, JpaSpecificat
     @Query("SELECT b FROM Book b JOIN b.tags t WHERE LOWER(t) = LOWER(:tag)")
     List<Book> findByTag(@Param("tag") String tag);
 
-    @Query("SELECT r.book FROM Rating r WHERE r.liked = true AND r.user.username = :username")
+    @Query("SELECT b FROM Book b JOIN b.likedUsers u WHERE u.username = :username")
     List<Book> findFavoritesByUsername(@Param("username") String username);
 
     @Query("SELECT AVG(b.rating) FROM Book b")
@@ -33,6 +35,12 @@ public interface BookRepository extends JpaRepository<Book, Long>, JpaSpecificat
     @Query("SELECT b.category, COUNT(b) FROM Book b GROUP BY b.category")
     List<Object[]> countBooksByCategory();
 
-    List<Book> findAll(Specification<Book> spec);
+    @Query("SELECT b FROM Book b WHERE b.qrCode = :qrCode")
+    java.util.Optional<Book> findByQrCode(@Param("qrCode") String qrCode);
+
+    long countByUserId(Long userId);
+
+    @NonNull
+    List<Book> findAll(@Nullable Specification<Book> spec);
 
 }

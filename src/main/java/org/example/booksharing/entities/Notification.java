@@ -4,6 +4,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Column;
 
 import java.time.LocalDateTime;
 
@@ -16,9 +17,17 @@ public class Notification {
     private Long userId;
     private String type; // COMMENT, BOOKING, LIKE
     private String message;
+
+    /**
+     * NOTE: The current DB schema contains BOTH columns: "is_read" and legacy "read", and both are NOT NULL.
+     * We map and keep them in sync to avoid insert/update failures.
+     */
+    @Column(name = "is_read", nullable = false)
     private boolean isRead = false;
-    private LocalDateTime createdAt = LocalDateTime.now();
+
+    @Column(name = "\"read\"", nullable = false)
     private boolean read = false;
+    private LocalDateTime createdAt = LocalDateTime.now();
 
     public Long getId() {
         return id;
@@ -57,7 +66,8 @@ public class Notification {
     }
 
     public void setRead(boolean read) {
-        isRead = read;
+        this.isRead = read;
+        this.read = read;
     }
 
     public LocalDateTime getCreatedAt() {

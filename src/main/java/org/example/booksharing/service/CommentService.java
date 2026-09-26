@@ -74,4 +74,22 @@ public class CommentService {
         h.setDetails("bookId=" + c.getBook().getId());
         historyRepo.save(h);
     }
+
+    @Transactional
+    public Comment updateComment(Long commentId, String text, String username) {
+        Comment c = commentRepo.findById(commentId).orElseThrow(() -> new RuntimeException("Comment not found"));
+        if (!c.getAuthor().getUsername().equals(username)) throw new RuntimeException("Forbidden");
+        c.setText(text);
+        Comment updated = commentRepo.save(c);
+
+        ActionHistory h = new ActionHistory();
+        h.setUserId(c.getAuthor().getId());
+        h.setActionType("UPDATE_COMMENT");
+        h.setEntityType("COMMENT");
+        h.setEntityId(commentId);
+        h.setDetails("bookId=" + c.getBook().getId());
+        historyRepo.save(h);
+
+        return updated;
+    }
 }

@@ -15,4 +15,6 @@ public interface RatingRepository extends JpaRepository<Rating, Long> {
 
     @Query("SELECT AVG(r.score) FROM Rating r WHERE r.book.id = :bookId AND r.score IS NOT NULL")
     Double avgScoreByBookId(@Param("bookId") Long bookId);
+
+    long countByUserId(Long userId);
 }

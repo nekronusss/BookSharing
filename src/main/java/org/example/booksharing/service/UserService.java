@@ -1,62 +1,76 @@
 package org.example.booksharing.service;
 
-import org.example.booksharing.entities.User;
-import org.example.booksharing.repository.UserRepository;
-import org.example.booksharing.repository.ActionHistoryRepository;
+import lombok.RequiredArgsConstructor;
 import org.example.booksharing.entities.ActionHistory;
+import org.example.booksharing.entities.User;
+import org.example.booksharing.exception.ResourceNotFoundException;
+import org.example.booksharing.repository.ActionHistoryRepository;
+import org.example.booksharing.repository.UserRepository;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.util.UUID;
+import java.util.List;
 
 @Service
+@RequiredArgsConstructor
 public class UserService {
 
     private final UserRepository userRepository;
     private final ActionHistoryRepository historyRepository;
-    private static final String UPLOAD_DIR = System.getProperty("user.dir") + "/uploads";
+    private final FileService fileService;
 
-    public UserService(UserRepository userRepository, ActionHistoryRepository historyRepository) {
-        this.userRepository = userRepository;
-        this.historyRepository = historyRepository;
+    @Transactional(readOnly = true)
+    public User getCurrentUser() {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        return userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
     }
 
     @Transactional
-    public User updateProfile(Long userId, String displayName, String email, MultipartFile avatar) throws IOException {
-        User user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("User not found"));
+    public User updateProfile(String displayName, String email, MultipartFile avatar) throws IOException {
+        User user = getCurrentUser();
 
         if (displayName != null && !displayName.isEmpty()) user.setDisplayName(displayName);
         if (email != null && !email.isEmpty()) user.setEmail(email);
 
         if (avatar != null && !avatar.isEmpty()) {
-            if (avatar.getSize() > 5 * 1024 * 1024) throw new RuntimeException("Avatar too large (max 5MB)");
-            String contentType = avatar.getContentType();
-            if (contentType == null || (!contentType.startsWith("image/")))
-                throw new RuntimeException("Invalid avatar type");
-
-            Files.createDirectories(Paths.get(UPLOAD_DIR));
-            String fileName = UUID.randomUUID() + "_" + avatar.getOriginalFilename();
-            File dest = Paths.get(UPLOAD_DIR, fileName).toFile();
-            avatar.transferTo(dest);
-
-            user.setAvatarUrl("/uploads/" + fileName);
+            String avatarUrl = fileService.uploadFile(avatar, "avatars");
+            if (user.getAvatarUrl() != null) {
+                fileService.deleteFile(user.getAvatarUrl());
+            }
+            user.setAvatarUrl(avatarUrl);
         }
 
         User updated = userRepository.save(user);
-
-        ActionHistory h = new ActionHistory();
-        h.setUserId(user.getId());
-        h.setActionType("UPDATE_PROFILE");
-        h.setEntityType("USER");
-        h.setEntityId(user.getId());
-        h.setDetails("displayName=" + displayName + ", email=" + email);
-        historyRepository.save(h);
-
+        logAction(user.getId(), "UPDATE_PROFILE", "USER", user.getId(), "Profile updated");
         return updated;
+    }
+
+    @Transactional
+    public void updatePrivacy(boolean privateProfile, boolean privateBooks) {
+        User user = getCurrentUser();
+        user.setPrivateProfile(privateProfile);
+        user.setPrivateBooks(privateBooks);
+        userRepository.save(user);
+        logAction(user.getId(), "UPDATE_PRIVACY", "USER", user.getId(), "Privacy settings updated");
+    }
+
+    @Transactional(readOnly = true)
+    public List<ActionHistory> getHistory() {
+        User user = getCurrentUser();
+        return historyRepository.findByUserIdOrderByCreatedAtDesc(user.getId());
+    }
+
+    private void logAction(Long userId, String actionType, String entityType, Long entityId, String details) {
+        ActionHistory h = new ActionHistory();
+        h.setUserId(userId);
+        h.setActionType(actionType);
+        h.setEntityType(entityType);
+        h.setEntityId(entityId);
+        h.setDetails(details);
+        historyRepository.save(h);
     }
 }

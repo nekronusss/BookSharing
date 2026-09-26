@@ -31,3 +31,13 @@ build/
 
 ### VS Code ###
 .vscode/
+
+# Local configuration and generated files
+.env
+.env.*
+!.env.example
+*.log
+.claude/
+.junie/
+uploads/
+**/oracleJdk-*/
