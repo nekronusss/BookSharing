@@ -1,107 +1,50 @@
-# Book Sharing Frontend
+# BookSharing — фронтенд
 
-A modern React frontend for the Book Sharing application.
+React-интерфейс каталога, профиля и обменов книгами. Полная инструкция с PostgreSQL и Spring Boot находится в [основном README](../README.md).
 
-## Features
+**React 18 · Vite 5 · React Router 6 · Axios · Tailwind CSS 3**
 
-- 🔐 User Authentication (Login/Register)
-- 📚 Book Browsing and Search
-- ➕ Create and Manage Books
-- ⭐ Rate and Comment on Books
-- ❤️ Favorites System
-- 👤 User Profile Management
-- 🎨 Modern UI with Tailwind CSS
+## Запуск
 
-## Tech Stack
+Понадобятся Node.js 22 или 24 с npm и работающий API на `http://localhost:8080`. Из этой папки:
 
-- **React 18** - UI library
-- **Vite** - Build tool
-- **React Router** - Routing
-- **Axios** - HTTP client
-- **Tailwind CSS** - Styling
-- **React Icons** - Icons
-
-## Getting Started
-
-### Prerequisites
-
-- Node.js 16+ and npm/yarn
-- Backend API running on `http://localhost:8080`
-
-### Installation
-
-1. Install dependencies:
-```bash
-npm install
-```
-
-2. Start the development server:
-```bash
+```sh
+npm ci
 npm run dev
 ```
 
-3. Open your browser to `http://localhost:4200`
+Откройте `http://localhost:4200`. Если порт занят, Vite выберет следующий свободный — точный адрес будет в терминале.
 
-### Building for Production
+## Подключение к API
 
-```bash
+По умолчанию [API-клиент](src/services/api.js) обращается напрямую к `http://localhost:8080`. Чтобы изменить адрес, создайте `frontend/.env.local`:
+
+```dotenv
+VITE_API_URL=http://localhost:8080
+```
+
+Перезапустите Vite или пересоберите сайт. Переменные `VITE_*` видны браузеру: секреты в них не размещают.
+
+В [vite.config.js](vite.config.js) есть dev-proxy `/api`. Для него можно установить `VITE_API_URL=/api`; в production этот proxy не работает — маршрут нужно настроить на веб-сервере. Загруженные изображения `/uploads/` также должны быть доступны через backend.
+
+## Сборка
+
+```sh
 npm run build
+npm run preview
 ```
 
-The built files will be in the `dist` directory.
+`dist/` содержит статические файлы. `preview` позволяет локально проверить сборку по адресу из терминала; API должен работать отдельно. Для публичного размещения нужны HTTPS, корректный `VITE_API_URL`, CORS на API и возврат `index.html` для маршрутов React Router.
 
-## Project Structure
+## Основные файлы
 
-```
-frontend/
-├── src/
-│   ├── components/      # Reusable components
-│   ├── pages/           # Page components
-│   ├── context/         # React context providers
-│   ├── services/        # API services
-│   └── App.jsx          # Main app component
-├── public/              # Static assets
-└── package.json         # Dependencies
-```
+| Путь | Назначение |
+| --- | --- |
+| `src/App.jsx` | Маршруты и ленивое подключение страниц |
+| `src/pages/` | Каталог, книга, обмены, профиль, вход и регистрация |
+| `src/components/` | Навигация, карточки, формы и QR-коды |
+| `src/context/AuthContext.jsx` | Состояние авторизации |
+| `src/services/api.js` | Запросы Axios и JWT-заголовок |
+| `src/index.css` | Стили и Tailwind |
 
-## API Configuration
-
-The frontend is configured to connect to the backend API at `http://localhost:8080`. 
-You can change this in `src/services/api.js` if needed.
-
-## Features Overview
-
-### Authentication
-- User registration and login
-- JWT token-based authentication
-- Protected routes
-
-### Books
-- Browse all books
-- Search and filter books
-- View book details
-- Create new books
-- Edit/delete your own books
-- Upload book covers/images
-
-### Social Features
-- Rate books (1-5 stars)
-- Like books
-- Comment on books
-- View favorites
-
-### User Profile
-- Update profile information
-- Upload avatar
-- Privacy settings
-
-## Development
-
-The app uses Vite for fast development with hot module replacement (HMR).
-
-## License
-
-Same as the main project.
-
-
-
+Токен хранится в `localStorage`; при `401` клиент удаляет его и открывает вход. UI-тесты и команда lint пока не настроены. Текущие ограничения описаны в [README](../README.md#границы-текущей-версии).

@@ -1,103 +1,196 @@
-# 📚 Book Sharing System with Users
+# BookSharing
 
-## Project description
-**Book Sharing System** is a web application for sharing books between users.  
-Each book has a unique QR code and can be “rented” by another user.  
-The project implements a simple book catalog with basic CRUD operations, plus a user system for authentication and authorization.
+Веб-приложение для обмена книгами. Добавьте свои книги в каталог, найдите интересующее издание и отправьте владельцу предложение обмена. Участники отслеживают отправку и подтверждают получение; после завершения обмена книги переходят к новым владельцам.
 
----
+**Java 21 · Spring Boot 3.5 · PostgreSQL · React 18 · Vite · Tailwind CSS**
 
-## Main functions
+[Запуск](#быстрый-старт) · [Первый обмен](#первый-обмен) · [API](docs/API.md) · [Фронтенд](frontend/README.md) · [Решение проблем](#решение-проблем)
 
-- Adding a new book (POST, only for authenticated users)
-- Getting a list of all books (GET)
-- Getting a book by ID (GET)
-- Deleting a book by ID (DELETE, only own books)
-- Updating information for books by ID (PUT, only own books)
-- User registration (POST /register)
-- User login (POST /login)
-- Getting current user info (GET /me)
+## Возможности
 
----
+- Регистрация по имени пользователя и паролю, вход с JWT.
+- Каталог с поиском, категориями, тегами и фильтрами.
+- Добавление книг с изображением или PDF, просмотр карточек, удаление собственных книг.
+- Избранное, оценки и комментарии.
+- Предложения обмена: принятие, отклонение, отправка, доставка и подтверждение получения.
+- Интерфейс QR-кодов и сканер в браузере; автоматическое присвоение кодов новым книгам пока не подключено.
+- Профиль с именем, email, аватаром и настройками приватности.
 
-## Stack used
+Это учебный full-stack проект для локального запуска и дальнейшей разработки. Репозиторий содержит сервер и интерфейс. Текущие ограничения перечислены [ниже](#границы-текущей-версии).
 
-- **Java 21+**
-- **Spring Boot**
-- **Spring Data JPA**
-- **PostgreSQL**
-- **Spring Security + JWT**
+## Быстрый старт
 
----
+### 1. Подготовьте инструменты
 
-## ⚙️ Launch instruction
+- **JDK 21**; `JAVA_HOME` должен указывать на JDK.
+- **Node.js 22 или 24** с npm для фронтенда.
+- **PostgreSQL** либо Docker для запуска отдельной локальной базы по примеру ниже.
+- Git для клонирования. Также можно скачать ZIP через **Code → Download ZIP**.
 
-### 1. User registration
-**POST /auth/register for 2 users** examples↓
-```json
-{
-  "username": "bob",
-  "password": "bob123"
-}
+Maven отдельно устанавливать не нужно: в репозитории есть Maven Wrapper. Для первой установки зависимостей нужен интернет.
+
+```sh
+git clone https://github.com/nekronusss/BookSharing.git
+cd BookSharing
 ```
 
-```json
-{
-  "username": "alice",
-  "password": "alice123"
-}
+### 2. Запустите базу
+
+При запущенном Docker Engine выполните в PowerShell или Bash:
+
+```sh
+docker run --name booksharing-db -e POSTGRES_DB=booksharing -e POSTGRES_USER=booksharing -e POSTGRES_PASSWORD=booksharing-local-only -p 127.0.0.1:55433:5432 -v booksharing-data:/var/lib/postgresql/data -d postgres:17
+docker exec booksharing-db pg_isready -U booksharing -d booksharing
 ```
 
-### 2. User login
-**POST /auth/login for users** examples↓
-```json
-{
-  "username": "bob",
-  "password": "bob123"
-}
+Дождитесь `accepting connections`. Пароль в примере предназначен только для этой локальной базы. Порт **55433** не занимает стандартный порт установленного PostgreSQL. Данные сохраняются в томе `booksharing-data`.
+
+При повторном запуске используйте `docker start booksharing-db`. Если PostgreSQL уже установлен, создайте отдельную БД `booksharing` и укажите свои параметры на следующем шаге.
+
+### 3. Запустите сервер
+
+Из корня репозитория, **PowerShell**:
+
+```powershell
+$env:SPRING_DATASOURCE_URL = "jdbc:postgresql://localhost:55433/booksharing"
+$env:SPRING_DATASOURCE_USERNAME = "booksharing"
+$env:SPRING_DATASOURCE_PASSWORD = "booksharing-local-only"
+$env:JWT_SECRET = node -p "require('node:crypto').randomBytes(32).toString('hex')"
+.\mvnw.cmd spring-boot:run
 ```
 
-```json
-{
-  "username": "alice",
-  "password": "alice123"
-}
-```
-### 3. User info GET /me and books info /books
+**macOS/Linux, Bash**:
 
-### 4. Creating a books POST /books *examples*↓
-```json
-{
-  "title": "Bob's Guide",
-  "author": "Bob Writer",
-  "year": 2020,
-  "description": "Programming guide",
-  "qrCode": "QR123Bob"
-}
+```bash
+export SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:55433/booksharing
+export SPRING_DATASOURCE_USERNAME=booksharing
+export SPRING_DATASOURCE_PASSWORD=booksharing-local-only
+export JWT_SECRET=$(node -p "require('node:crypto').randomBytes(32).toString('hex')")
+sh mvnw spring-boot:run
 ```
 
-```json
-{
-"title": "Alice Adventures",
-"author": "Alice Writer",
-"year": 2021,
-"description": "A guide to adventures",
-"qrCode": "QR123Alice"
-}
+API будет доступен на **http://localhost:8080**. Дождитесь сообщения `Started BookSharingApplication`. Hibernate создаёт/обновляет таблицы при старте (`ddl-auto: update`); импорт SQL-файла не требуется.
+
+Переменные действуют в текущем терминале и переопределяют `application.yaml`. Обычный `.env` сервер автоматически не читает. Повторная генерация `JWT_SECRET` делает ранее выданные токены недействительными — после неё войдите заново.
+
+### 4. Запустите интерфейс
+
+В другом терминале, из корня репозитория:
+
+```sh
+cd frontend
+npm ci
+npm run dev
 ```
 
-### 5. Book info updating PUT /books/{id} *examples*↓
-```json
-{
-  "title": "Bob's Guide",
-  "author": "Bob Writer",
-  "year": 2020,
-  "description": "Programming guide",
-  "qrCode": "QR123Bob ⇐ QR321bOB *changed*"
-}
+Откройте **[http://localhost:4200](http://localhost:4200)**. По умолчанию интерфейс обращается к API на порту 8080. Оба терминала должны оставаться запущенными.
+
+| Компонент | Адрес |
+| --- | --- |
+| Сайт | `http://localhost:4200` |
+| API каталога | `http://localhost:8080/books` |
+| PostgreSQL из примера | `localhost:55433`, база `booksharing` |
+
+Новая база содержит пустой каталог. Готовых аккаунтов и демонстрационных книг нет.
+
+## Первый обмен
+
+1. Зарегистрируйтесь и войдите под первым пользователем. Добавьте книгу с названием, автором и годом; файл необязателен.
+2. Откройте приватное окно браузера и зарегистрируйте второго пользователя. Так сессии двух аккаунтов не будут перезаписывать друг друга.
+3. Под вторым аккаунтом откройте книгу первого пользователя и создайте предложение обмена. Можно предварительно добавить свою книгу и предложить её взамен.
+4. Под первым аккаунтом откройте обмены, примите предложение и отметьте отправку.
+5. Под вторым аккаунтом отметьте доставку. Затем оба участника подтверждают получение.
+6. После двух подтверждений обмен завершается, владельцы участвующих книг обновляются.
+
+```mermaid
+flowchart LR
+    A[Предложение] --> B[Ожидание отправки]
+    B --> C[В пути]
+    C --> D[Доставлено]
+    D --> E[Оба подтвердили получение]
+    E --> F[Обмен завершён]
 ```
 
-### 6. Books deleting DELETE /books/id *examples*↓
-```json
-"http://localhost:8080/books/{id} ⇐ example" 
+Владелец может отклонить ожидающее предложение, а инициатор — отменить его. Приложение хранит этапы обмена и трек-номер; интеграции с курьерскими службами нет.
+
+## Конфигурация
+
+| Переменная | Назначение |
+| --- | --- |
+| `SPRING_DATASOURCE_URL` | JDBC-адрес PostgreSQL |
+| `SPRING_DATASOURCE_USERNAME` / `SPRING_DATASOURCE_PASSWORD` | Учётные данные БД |
+| `JWT_SECRET` | Секрет подписи JWT, минимум 32 байта для HS256 |
+| `JWT_EXPIRATION` | Срок действия токена в миллисекундах; по умолчанию `3600000` |
+| `SERVER_PORT` | Порт API; по умолчанию `8080` |
+| `VITE_API_URL` | Адрес API для фронтенда; по умолчанию `http://localhost:8080` |
+
+Для изменения адреса API создайте `frontend/.env.local`:
+
+```dotenv
+VITE_API_URL=http://localhost:8080
 ```
+
+После изменения перезапустите Vite или пересоберите фронтенд. JWT хранится в `localStorage` и передаётся как `Authorization: Bearer …`. Загруженные файлы сохраняются в `uploads/` относительно рабочей папки сервера; сохраняйте этот каталог вместе с базой при переносе приложения.
+
+## Сборка и проверки
+
+Сервер, из корня репозитория, с запущенной БД и переменными из инструкции:
+
+```powershell
+.\mvnw.cmd test
+.\mvnw.cmd package
+java -jar target/BookSharing-0.0.1-SNAPSHOT.jar
+```
+
+В Bash используйте `sh mvnw test` и `sh mvnw package`. Перед запуском JAR остановите сервер разработки через Ctrl+C. `package` также запускает тесты.
+
+Фронтенд:
+
+```sh
+cd frontend
+npm ci
+npm run build
+```
+
+Сборка появляется в `frontend/dist/` и не включается автоматически в JAR. Для размещения нужен веб-сервер с поддержкой маршрутов SPA и доступом к API.
+
+Сейчас в сервере один тест загрузки Spring-контекста, которому нужна PostgreSQL. Отдельного набора тестов бизнес-логики, UI-тестов и GitHub Actions workflow пока нет. Сборка сама по себе не проверяет полный сценарий обмена.
+
+## Решение проблем
+
+| Симптом | Что проверить |
+| --- | --- |
+| `release version 21 not supported` | `java -version`, `JAVA_HOME` и `.\mvnw.cmd -v` должны указывать на JDK 21 |
+| Нет соединения с БД | `docker ps`, `pg_isready`, адрес, порт и учётные данные в текущем терминале |
+| Порт 8080 занят | Остановите другой сервер или измените `SERVER_PORT` и `VITE_API_URL` вместе |
+| Vite выбрал 4201 | Порт 4200 занят; смотрите фактический адрес в терминале |
+| PowerShell блокирует `npm.ps1` | Используйте `npm.cmd ci` и `npm.cmd run dev` |
+| После перезапуска API ответ `401` | Войдите заново: токен мог истечь или изменился `JWT_SECRET` |
+| Создание книги возвращает `415` | Нужен multipart, а не JSON-тело; пример в [API](docs/API.md) |
+| Не работает камера | Разрешите доступ; вне localhost браузеру нужен HTTPS |
+
+Для остановки завершите сервер и Vite через Ctrl+C, затем выполните `docker stop booksharing-db`. Удаление Docker volume удаляет данные PostgreSQL; для обычной остановки это не требуется.
+
+## Структура
+
+```text
+src/main/java/org/example/booksharing/
+  controller/     HTTP-эндпоинты
+  service/        Книги, обмены и пользователи
+  repository/     Spring Data JPA
+  entities/       Модель данных
+  dto/            Запросы и ответы
+  security/       JWT, BCrypt и правила доступа
+src/main/resources/application.yaml
+src/test/         Тест загрузки Spring-контекста
+frontend/src/     React: страницы, компоненты и API-клиент
+docs/API.md       Примеры HTTP-запросов
+```
+
+## Границы текущей версии
+
+Проект рассчитан на разработку и демонстрацию. Перед публичным размещением нужно настроить HTTPS и CORS для реального домена, вынести секреты в окружение, внедрить миграции вместо `ddl-auto: update` и расширить проверки доступа и автоматические тесты. В `application.yaml` находятся демонстрационные пароль БД и JWT-секрет — инструкция выше переопределяет их.
+
+В API-клиенте есть вызовы `PUT /books/{id}` и `/qrcode/exchange/{id}`, но соответствующих обработчиков в сервере сейчас нет: редактирование книги и QR-коды обменов не заявляются рабочими возможностями. Новым книгам не присваивается `qrCode`, поэтому их QR-карточка пока остаётся пустой. Сброс пароля и подтверждение email не реализованы. `cors.allowed-origin` используется MVC-конфигурацией, однако Spring Security отдельно разрешает только локальные origin; для другого домена нужно согласовать обе конфигурации.
+
+Ошибку можно описать в [Issues](https://github.com/nekronusss/BookSharing/issues), указав шаги воспроизведения и версии Java/Node. Порядок работы с изменениями — в [CONTRIBUTING.md](CONTRIBUTING.md).
