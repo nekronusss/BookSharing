@@ -29,6 +29,7 @@ public class Book {
     private String title;
     private String author;
     private int year;
+    @Column(length = 5000)
     private String description;
     private LocalDate addedDate;
     private String qrCode;
@@ -214,5 +215,10 @@ public class Book {
     @PrePersist
     public void prePersist() {
         addedDate = LocalDate.now();
+        updatedAt = LocalDateTime.now();
+        if (qrCode == null || qrCode.isBlank()) qrCode = "BOOK-" + java.util.UUID.randomUUID();
     }
+
+    @PreUpdate
+    public void preUpdate() { updatedAt = LocalDateTime.now(); }
 }

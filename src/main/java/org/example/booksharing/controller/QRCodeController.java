@@ -27,9 +27,11 @@ public class QRCodeController {
     private final QRCodeService qrCodeService;
     private final BookRepository bookRepository;
     private final RatingRepository ratingRepository;
+    private final org.example.booksharing.service.BookService bookService;
 
     @GetMapping("/book/{bookId}")
     public ResponseEntity<byte[]> generateQRCodeByBookId(@PathVariable Long bookId) {
+        bookService.getBookById(bookId);
         Book book = bookRepository.findById(bookId)
                 .orElseThrow(() -> new ResourceNotFoundException("Book not found"));
 
@@ -78,7 +80,7 @@ public class QRCodeController {
                 bookDto.setIsLikedByUser(isLiked);
             }
             
-            return ResponseEntity.ok(bookDto);
+            return ResponseEntity.ok(bookService.getBookById(book.getId()));
         }
         
         throw new ResourceNotFoundException("QR code not found");
