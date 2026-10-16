@@ -267,6 +267,10 @@ public class ExchangeService {
     }
     
     private ExchangeDto toExchangeDto(Exchange exchange, Long currentUserId) {
+        if (!exchange.getRequester().getId().equals(currentUserId)
+                && !exchange.getOfferer().getId().equals(currentUserId)) {
+            throw new org.springframework.security.access.AccessDeniedException("Exchange is private");
+        }
         ExchangeDto dto = new ExchangeDto();
         dto.setId(exchange.getId());
         dto.setRequesterId(exchange.getRequester().getId());
@@ -308,7 +312,8 @@ public class ExchangeService {
                 dto.setCanMarkAsDelivered(isRequester);
                 break;
             case DELIVERED:
-                dto.setCanConfirmReceipt(true);  // Both can confirm
+                dto.setCanConfirmReceipt((isRequester && !exchange.getRequesterConfirmedReceipt())
+                        || (isOfferer && !exchange.getOffererConfirmedReceipt()));
                 break;
             case COMPLETED:
             case REJECTED:
