@@ -14,22 +14,6 @@ public class WebConfig implements WebMvcConfigurer {
     private String allowedOrigin;
 
     @Override
-    public void addCorsMappings(@NonNull CorsRegistry registry) {
-        registry.addMapping("/**")
-                .allowedOrigins(
-                    allowedOrigin,
-                    "http://localhost:4201",
-                    "http://127.0.0.1:4201",
-                    "http://localhost:4200",
-                    "http://127.0.0.1:4200"
-                )
-                .allowedMethods("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS")
-                .allowedHeaders("*")
-                .allowCredentials(true)
-                .maxAge(3600);
-    }
-
-    @Override
     public void addResourceHandlers(@NonNull ResourceHandlerRegistry registry) {
         String uploadPath = "file:" + System.getProperty("user.dir") + "/uploads/";
         registry.addResourceHandler("/uploads/**")
