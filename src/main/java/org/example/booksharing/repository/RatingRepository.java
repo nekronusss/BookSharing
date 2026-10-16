@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 import java.util.Optional;
 
 public interface RatingRepository extends JpaRepository<Rating, Long> {
+    Optional<Rating> findByBookIdAndUserUsername(Long bookId, String username);
     Optional<Rating> findByUserIdAndBookId(Long userId, Long bookId);
 
     @Query("SELECT COUNT(r) FROM Rating r WHERE r.book.id = :bookId AND r.liked = true")

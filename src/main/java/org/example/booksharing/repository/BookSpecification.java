@@ -11,6 +11,12 @@ import java.util.List;
 
 public class BookSpecification {
 
+    public static Specification<Book> visibleTo(String username) {
+        return (root, query, cb) -> cb.or(
+                cb.equal(root.get("user").get("username"), username == null ? "" : username),
+                cb.and(cb.isTrue(root.get("isPublic")), cb.isFalse(root.get("user").get("privateBooks"))));
+    }
+
     public static Specification<Book> filter(
             String search,
             String author,
@@ -25,7 +31,9 @@ public class BookSpecification {
             List<Predicate> predicates = new ArrayList<>();
 
             if (search != null && !search.isEmpty()) {
-                predicates.add(cb.like(cb.lower(root.get("title")), "%" + search.toLowerCase() + "%"));
+                String pattern = "%" + search.toLowerCase(java.util.Locale.ROOT) + "%";
+                predicates.add(cb.or(cb.like(cb.lower(root.get("title")), pattern),
+                        cb.like(cb.lower(root.get("author")), pattern)));
             }
 
             if (author != null && !author.isEmpty()) {

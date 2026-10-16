@@ -17,16 +17,20 @@ public class CreateBookRequest {
     private String author;
     
     @NotNull(message = "Year is required")
+    @jakarta.validation.constraints.Min(1000)
+    @jakarta.validation.constraints.Max(3000)
     private Integer year;
     
     @Size(max = 5000, message = "Description must not exceed 5000 characters")
     private String description;
     
-    private List<String> tags = new ArrayList<>();
+    @Size(max = 20)
+    private List<@Size(max = 100) String> tags = new ArrayList<>();
     
     @Size(max = 100, message = "Category must not exceed 100 characters")
     private String category;
     
+    @com.fasterxml.jackson.annotation.JsonAlias("public")
     private Boolean isPublic = true;
 
     public CreateBookRequest() {}

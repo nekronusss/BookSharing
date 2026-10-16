@@ -23,6 +23,10 @@ public class BookDto {
     
     private String qrCode;
     private Double rating = 0.0;
+    private Integer userScore = 0;
+
+    public Integer getUserScore() { return userScore; }
+    public void setUserScore(Integer userScore) { this.userScore = userScore; }
     private Integer views = 0;
     
     @JsonSerialize(using = LocalDateTimeSerializer.class)

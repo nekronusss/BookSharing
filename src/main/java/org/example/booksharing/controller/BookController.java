@@ -24,6 +24,14 @@ public class BookController {
 
     private final BookService bookService;
     private final ObjectMapper objectMapper;
+    private final jakarta.validation.Validator validator;
+
+    private CreateBookRequest parseRequest(String json) throws IOException {
+        CreateBookRequest request = objectMapper.readValue(json, CreateBookRequest.class);
+        var errors = validator.validate(request);
+        if (!errors.isEmpty()) throw new IllegalArgumentException(errors.iterator().next().getMessage());
+        return request;
+    }
 
     @GetMapping
     public ResponseEntity<List<BookDto>> getBooks(
@@ -40,13 +48,20 @@ public class BookController {
             @RequestPart("book") String bookJson,
             @RequestPart(value = "file", required = false) MultipartFile file
     ) throws IOException {
-        CreateBookRequest request = objectMapper.readValue(bookJson, CreateBookRequest.class);
+        CreateBookRequest request = parseRequest(bookJson);
         return ResponseEntity.status(HttpStatus.CREATED).body(bookService.addBook(request, file));
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<BookDto> getBookById(@PathVariable Long id) {
         return ResponseEntity.ok(bookService.getBookById(id));
+    }
+
+    @PutMapping(value = "/{id}", consumes = "multipart/form-data")
+    public ResponseEntity<BookDto> updateBook(@PathVariable Long id,
+            @RequestPart("book") String bookJson,
+            @RequestPart(value = "file", required = false) MultipartFile file) throws IOException {
+        return ResponseEntity.ok(bookService.updateBook(id, parseRequest(bookJson), file));
     }
 
     @DeleteMapping("/{id}")

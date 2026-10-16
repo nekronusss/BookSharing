@@ -50,6 +50,7 @@ public class BookService {
 
         String currentUsername = getCurrentUsername();
         return books.stream()
+                .filter(book -> canView(book, currentUsername))
                 .map(book -> enrichAndMap(book, currentUsername))
                 .toList();
     }
@@ -88,11 +89,35 @@ public class BookService {
     public BookDto getBookById(Long id) {
         Book book = bookRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Book not found"));
+        if (!canView(book, getCurrentUsername())) throw new ResourceNotFoundException("Book not found");
+        book.setViews((book.getViews() == null ? 0 : book.getViews()) + 1);
         
         book.setActivityScore((book.getActivityScore() != null ? book.getActivityScore() : 0) + 1);
         bookRepository.save(book);
         
         return enrichAndMap(book, getCurrentUsername());
+    }
+
+    @Transactional
+    public BookDto updateBook(Long id, CreateBookRequest request, MultipartFile file) throws IOException {
+        String username = getCurrentUsername();
+        Book book = bookRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Book not found"));
+        if (!book.getUser().getUsername().equals(username))
+            throw new org.springframework.security.access.AccessDeniedException("Only the owner can edit this book");
+        book.setTitle(request.getTitle().trim());
+        book.setAuthor(request.getAuthor().trim());
+        book.setYear(request.getYear());
+        book.setDescription(request.getDescription());
+        book.setCategory(request.getCategory());
+        book.setTags(request.getTags());
+        book.setPublic(!Boolean.FALSE.equals(request.getIsPublic()));
+        if (file != null && !file.isEmpty()) book.setImageUrl(fileService.uploadFile(file, "books"));
+        return enrichAndMap(bookRepository.save(book), username);
+    }
+
+    private boolean canView(Book book, String username) {
+        return book.getUser() != null && (book.getUser().getUsername().equals(username)
+                || (!Boolean.FALSE.equals(book.getPublic()) && !book.getUser().isPrivateBooks()));
     }
 
     @Transactional
@@ -108,10 +133,16 @@ public class BookService {
             throw new ResourceNotFoundException("You cannot delete someone else's book");
         }
 
-        if (book.getFileUrl() != null) fileService.deleteFile(book.getFileUrl());
-        if (book.getImageUrl() != null) fileService.deleteFile(book.getImageUrl());
-
+        String fileUrl = book.getFileUrl();
+        String imageUrl = book.getImageUrl();
         bookRepository.deleteById(id);
+        org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                new org.springframework.transaction.support.TransactionSynchronization() {
+                    @Override public void afterCommit() {
+                        fileService.deleteFile(fileUrl);
+                        fileService.deleteFile(imageUrl);
+                    }
+                });
     }
 
     @Transactional
@@ -147,6 +178,7 @@ public class BookService {
         String username = getCurrentUsername();
         List<Book> favorites = bookRepository.findFavoritesByUsername(username);
         return favorites.stream()
+                .filter(book -> canView(book, username))
                 .map(book -> enrichAndMap(book, username))
                 .toList();
     }
@@ -156,7 +188,8 @@ public class BookService {
                                      String category, String tag, Integer viewsMin, LocalDateTime updatedAfter, 
                                      Pageable pageable) {
         Page<Book> bookPage = bookRepository.findAll(
-                BookSpecification.filter(search, author, ratingMin, ratingMax, category, tag, viewsMin, updatedAfter),
+                BookSpecification.filter(search, author, ratingMin, ratingMax, category, tag, viewsMin, updatedAfter)
+                        .and(BookSpecification.visibleTo(getCurrentUsername())),
                 pageable
         );
 
@@ -180,6 +213,9 @@ public class BookService {
         Double avgRating = ratingRepository.avgScoreByBookId(book.getId());
         BookDto dto = DtoMapper.toBookDto(book);
         dto.setRating(avgRating != null ? avgRating : 0.0);
+        if (currentUsername != null) dto.setUserScore(ratingRepository
+                .findByBookIdAndUserUsername(book.getId(), currentUsername)
+                .map(org.example.booksharing.entities.Rating::getScore).orElse(0));
         
         if (currentUsername != null && book.getLikedUsers() != null) {
             boolean isLiked = book.getLikedUsers().stream()
