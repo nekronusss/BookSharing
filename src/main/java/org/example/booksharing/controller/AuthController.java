@@ -60,11 +60,11 @@ public class AuthController {
         } catch (DataIntegrityViolationException e) {
             return ResponseEntity.status(HttpStatus.CONFLICT)
                     .body(Map.of("status", 409, "error", "Conflict", "message", 
-                            "Username or email already exists or constraint violation: " + e.getMessage()));
+                            "Username or email already exists"));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("status", 500, "error", "Internal Server Error", 
-                            "message", "Registration failed: " + e.getMessage()));
+                            "message", "Registration failed"));
         }
     }
 
