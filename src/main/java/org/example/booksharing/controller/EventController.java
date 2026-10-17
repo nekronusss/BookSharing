@@ -1,78 +1,89 @@
 package org.example.booksharing.controller;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.example.booksharing.dto.EventDto;
+import org.example.booksharing.dto.EventRequest;
 import org.example.booksharing.entities.Book;
 import org.example.booksharing.entities.Event;
 import org.example.booksharing.entities.User;
+import org.example.booksharing.exception.ResourceNotFoundException;
 import org.example.booksharing.repository.BookRepository;
 import org.example.booksharing.repository.EventRepository;
-import org.example.booksharing.repository.UserRepository;
+import org.example.booksharing.security.ResourceAccess;
+import org.example.booksharing.service.UserService;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/events")
 @RequiredArgsConstructor
 public class EventController {
-
     private final EventRepository eventRepository;
-    private final UserRepository userRepository;
+    private final UserService userService;
     private final BookRepository bookRepository;
 
-
     @PostMapping
-    public ResponseEntity<Event> createEvent(@RequestBody Map<String, Object> payload) {
-        Long userId = Long.valueOf(payload.get("userId").toString());
-        Long bookId = Long.valueOf(payload.get("bookId").toString());
-
-        User user = userRepository.findById(userId).orElseThrow();
-        Book book = bookRepository.findById(bookId).orElseThrow();
+    @Transactional
+    public ResponseEntity<EventDto> createEvent(@Valid @RequestBody EventRequest request) {
+        User user = userService.requireCurrentUser(request.userId());
+        if (request.bookId() == null) throw new IllegalArgumentException("Book ID is required");
+        Book book = bookRepository.findById(request.bookId())
+                .orElseThrow(() -> new ResourceNotFoundException("Book not found"));
+        ResourceAccess.requireVisibleBook(book, user);
 
         Event event = new Event();
-        event.setTitle((String) payload.get("title"));
-        event.setDescription((String) payload.get("description"));
-        event.setPriority((Integer) payload.get("priority"));
-        event.setDateTime(LocalDateTime.parse((String) payload.get("dateTime")));
+        apply(event, request);
         event.setUser(user);
         event.setBook(book);
-
-        Event saved = eventRepository.save(event);
-        return ResponseEntity.ok(saved);
+        return ResponseEntity.ok(EventDto.from(eventRepository.save(event)));
     }
 
-
-
     @GetMapping
-    public List<Event> getEventsByDate(
-            @RequestParam Long user_id,
-            @RequestParam String date
-    ) {
-        LocalDate day = LocalDate.parse(date);
-
-        return eventRepository.findByUserIdAndDateTimeBetween(
-                user_id,
-                day.atStartOfDay(),
-                day.plusDays(1).atStartOfDay()
-        );
+    @Transactional(readOnly = true)
+    public List<EventDto> getEventsByDate(
+            @RequestParam(required = false) Long user_id,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        User user = userService.requireCurrentUser(user_id);
+        return eventRepository.findForDay(user.getId(), date.atStartOfDay(), date.plusDays(1).atStartOfDay())
+                .stream().map(EventDto::from).toList();
     }
 
     @PutMapping("/{id}")
-    public Event updateEvent(@PathVariable Long id, @RequestBody Event updated) {
-        Event event = eventRepository.findById(id).orElseThrow();
-        event.setTitle(updated.getTitle());
-        event.setDescription(updated.getDescription());
-        event.setDateTime(updated.getDateTime());
-        event.setPriority(updated.getPriority());
-        return eventRepository.save(event);
+    @Transactional
+    public EventDto updateEvent(@PathVariable Long id, @Valid @RequestBody EventRequest request) {
+        User user = userService.requireCurrentUser(request.userId());
+        Event event = ownedEvent(id, user);
+        if (request.bookId() != null
+                && (event.getBook() == null || !request.bookId().equals(event.getBook().getId()))) {
+            throw new IllegalArgumentException("An event's book cannot be changed");
+        }
+        apply(event, request);
+        return EventDto.from(eventRepository.save(event));
     }
 
     @DeleteMapping("/{id}")
+    @Transactional
     public void deleteEvent(@PathVariable Long id) {
-        eventRepository.deleteById(id);
+        eventRepository.delete(ownedEvent(id, userService.getCurrentUser()));
+    }
+
+    private Event ownedEvent(Long id, User user) {
+        Event event = eventRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Event not found"));
+        ResourceAccess.requireOwner(event.getUser(), user, "Event");
+        return event;
+    }
+
+    private void apply(Event event, EventRequest request) {
+        event.setTitle(request.title().trim());
+        event.setDescription(request.description());
+        event.setPriority(request.priority());
+        event.setDateTime(request.dateTime());
     }
 }
