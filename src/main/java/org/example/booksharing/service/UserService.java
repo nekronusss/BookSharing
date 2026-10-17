@@ -3,10 +3,12 @@ package org.example.booksharing.service;
 import lombok.RequiredArgsConstructor;
 import org.example.booksharing.entities.ActionHistory;
 import org.example.booksharing.entities.User;
-import org.example.booksharing.exception.ResourceNotFoundException;
 import org.example.booksharing.repository.ActionHistoryRepository;
 import org.example.booksharing.repository.UserRepository;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -24,17 +26,31 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public User getCurrentUser() {
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()
+                || authentication instanceof AnonymousAuthenticationToken) {
+            throw new AuthenticationCredentialsNotFoundException("Authentication required");
+        }
+        String username = authentication.getName();
         return userRepository.findByUsername(username)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+                .orElseThrow(() -> new AuthenticationCredentialsNotFoundException("Authentication required"));
+    }
+
+    // Legacy clients may still send userId, but it must never select the acting user.
+    public User requireCurrentUser(Long claimedUserId) {
+        User user = getCurrentUser();
+        if (claimedUserId != null && !user.getId().equals(claimedUserId)) {
+            throw new AccessDeniedException("Cannot act as another user");
+        }
+        return user;
     }
 
     @Transactional
     public User updateProfile(String displayName, String email, MultipartFile avatar) throws IOException {
         User user = getCurrentUser();
 
-        if (displayName != null && !displayName.isEmpty()) user.setDisplayName(displayName);
-        if (email != null && !email.isEmpty()) user.setEmail(email);
+        if (displayName != null) user.setDisplayName(displayName.trim());
+        if (email != null) user.setEmail(email.isBlank() ? null : email.trim());
 
         if (avatar != null && !avatar.isEmpty()) {
             String avatarUrl = fileService.uploadFile(avatar, "avatars");

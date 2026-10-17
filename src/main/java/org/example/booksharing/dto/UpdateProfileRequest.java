@@ -3,9 +3,11 @@ package org.example.booksharing.dto;
 import jakarta.validation.constraints.Email;
 
 public class UpdateProfileRequest {
+    @jakarta.validation.constraints.Size(max = 100)
     private String displayName;
     
     @Email(message = "Invalid email format")
+    @jakarta.validation.constraints.Size(max = 254)
     private String email;
 
     public UpdateProfileRequest() {}

@@ -24,6 +24,7 @@ public class UserController {
     private final UserService userService;
     private final UserListService userListService;
     private final ObjectMapper objectMapper;
+    private final jakarta.validation.Validator validator;
 
     @GetMapping("/me")
     public ResponseEntity<UserDto> getCurrentUser() {
@@ -40,6 +41,8 @@ public class UserController {
                 ? objectMapper.readValue(profileJson, UpdateProfileRequest.class)
                 : new UpdateProfileRequest();
 
+        var errors = validator.validate(request);
+        if (!errors.isEmpty()) throw new IllegalArgumentException(errors.iterator().next().getMessage());
         User updated = userService.updateProfile(request.getDisplayName(), request.getEmail(), avatar);
         return ResponseEntity.ok(DtoMapper.toUserDto(updated));
     }
