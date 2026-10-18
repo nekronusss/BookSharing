@@ -1,58 +1,87 @@
-import React, { useEffect } from 'react';
-import { FiX } from 'react-icons/fi';
-
-const Modal = ({ 
-  isOpen, 
-  onClose, 
-  title, 
-  children, 
+import React, { useEffect, useId, useRef } from "react";
+import { FiX } from "react-icons/fi";
+export default function Modal({
+  isOpen,
+  onClose,
+  title,
+  children,
   footer,
-  maxWidth = 'max-w-lg'
-}) => {
+  maxWidth = "max-w-lg",
+}) {
+  const ref = useRef(null),
+    closeRef = useRef(onClose),
+    titleId = useId();
+  closeRef.current = onClose;
   useEffect(() => {
-    const handleEscape = (e) => {
-      if (e.key === 'Escape') onClose();
+    if (!isOpen) return;
+    const previous = document.activeElement,
+      overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const focusable = () => [
+      ...ref.current.querySelectorAll(
+        'button:not(:disabled),a[href],input:not(:disabled),select:not(:disabled),textarea:not(:disabled),[tabindex="0"]',
+      ),
+    ];
+    (focusable()[0] || ref.current).focus();
+    const key = (e) => {
+      if (e.key === "Escape") closeRef.current();
+      if (e.key === "Tab") {
+        const nodes = focusable(),
+          first = nodes[0],
+          last = nodes[nodes.length - 1];
+        if (!first) {
+          e.preventDefault();
+          return;
+        }
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
     };
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-      window.addEventListener('keydown', handleEscape);
-    }
+    document.addEventListener("keydown", key);
     return () => {
-      document.body.style.overflow = 'unset';
-      window.removeEventListener('keydown', handleEscape);
+      document.body.style.overflow = overflow;
+      document.removeEventListener("keydown", key);
+      previous?.focus();
     };
-  }, [isOpen, onClose]);
-
+  }, [isOpen]);
   if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
-      <div 
-        className={`bg-white rounded-lg shadow-xl w-full ${maxWidth} overflow-hidden flex flex-col`}
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40"
+      onClick={() => onClose()}
+    >
+      <div
+        ref={ref}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        className={
+          "bg-white rounded-xl shadow-xl w-full max-h-[90vh] overflow-hidden flex flex-col " +
+          maxWidth
+        }
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-6 py-4 border-b">
-          <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
-          <button 
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-500 transition-colors"
-          >
-            <FiX className="h-5 w-5" />
+          <h3 id={titleId} className="font-semibold">
+            {title}
+          </h3>
+          <button aria-label="Закрыть диалог" onClick={onClose} className="p-2">
+            <FiX />
           </button>
         </div>
-        
-        <div className="px-6 py-4 overflow-y-auto">
-          {children}
-        </div>
-        
+        <div className="px-6 py-5 overflow-y-auto">{children}</div>
         {footer && (
-          <div className="px-6 py-4 border-t bg-gray-50 flex justify-end space-x-3">
+          <div className="px-6 py-4 border-t bg-gray-50 flex justify-end gap-3">
             {footer}
           </div>
         )}
       </div>
     </div>
   );
-};
-
-export default Modal;
+}

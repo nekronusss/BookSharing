@@ -1,7 +1,12 @@
-import React from 'react';
-import { FiSearch, FiX } from 'react-icons/fi';
+import React from "react";
+import { FiSearch, FiX } from "react-icons/fi";
 
-const SearchInput = ({ value, onChange, placeholder = 'Search...', onClear }) => {
+const SearchInput = ({
+  value,
+  onChange,
+  placeholder = "Search...",
+  onClear,
+}) => {
   return (
     <div className="relative">
       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">

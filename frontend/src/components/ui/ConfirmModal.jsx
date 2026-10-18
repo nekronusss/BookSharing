@@ -1,17 +1,17 @@
-import React from 'react';
-import Modal from './Modal';
-import Button from './Button';
+import React from "react";
+import Modal from "./Modal";
+import Button from "./Button";
 
-const ConfirmModal = ({ 
-  isOpen, 
-  onClose, 
-  onConfirm, 
-  title = 'Confirm Action', 
-  message = 'Are you sure you want to perform this action?',
-  confirmText = 'Confirm',
-  cancelText = 'Cancel',
-  variant = 'danger',
-  loading = false
+const ConfirmModal = ({
+  isOpen,
+  onClose,
+  onConfirm,
+  title = "Подтвердите действие",
+  message = "Выполнить это действие?",
+  confirmText = "Подтвердить",
+  cancelText = "Отмена",
+  variant = "danger",
+  loading = false,
 }) => {
   return (
     <Modal
