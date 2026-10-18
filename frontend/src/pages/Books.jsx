@@ -1,176 +1,206 @@
-import React, { useState, useEffect } from 'react';
-import { bookAPI, API_BASE_URL } from '../services/api';
-import BookCard from '../components/book/BookCard';
-import SearchInput from '../components/ui/SearchInput';
-import { FiFilter } from 'react-icons/fi';
-import { useDebounce } from '../hooks/useDebounce';
-
-const Books = () => {
-  const [books, setBooks] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [searching, setSearching] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [category, setCategory] = useState('');
-  const [tag, setTag] = useState('');
-  const [showFilters, setShowFilters] = useState(false);
-  
-  const debouncedSearchTerm = useDebounce(searchTerm, 500);
-  const debouncedCategory = useDebounce(category, 500);
-  const debouncedTag = useDebounce(tag, 500);
-
-  const loadBooks = async (isInitial = false) => {
-    if (isInitial) {
-      setLoading(true);
-    } else {
-      setSearching(true);
-    }
-    
-    try {
-      const params = {};
-      if (searchTerm.trim()) params.search = searchTerm.trim();
-      if (category.trim()) params.category = category.trim();
-      if (tag.trim()) params.tag = tag.trim();
-      const response = await bookAPI.getAll(params);
-      setBooks(response.data);
-    } catch (error) {
-      console.error('Error loading books:', error);
-    } finally {
-      setLoading(false);
-      setSearching(false);
-    }
-  };
-
+import React, { useEffect, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
+import {
+  FiSearch,
+  FiPlus,
+  FiArrowLeft,
+  FiArrowRight,
+  FiBookOpen,
+  FiX,
+} from "react-icons/fi";
+import { bookAPI } from "../services/api";
+import BookCard from "../components/book/BookCard";
+import Button from "../components/ui/Button";
+import { useDebounce } from "../hooks/useDebounce";
+const categories = [
+  "Все книги",
+  "Классика",
+  "Художественная литература",
+  "Фантастика",
+  "Нон-фикшн",
+  "Наука",
+  "Детские книги",
+];
+export default function Books() {
+  const [params, setParams] = useSearchParams();
+  const [search, setSearch] = useState(params.get("search") || "");
+  const term = useDebounce(search, 350),
+    category = params.get("category") || "",
+    page = Math.max(0, Number(params.get("page")) || 0),
+    sort = params.get("sort") || "addedDate,desc";
+  const [result, setResult] = useState({
+      content: [],
+      totalElements: 0,
+      totalPages: 0,
+    }),
+    [loading, setLoading] = useState(true),
+    [error, setError] = useState(""),
+    [retry, setRetry] = useState(0);
   useEffect(() => {
-    loadBooks(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    // Only trigger if not loading (to avoid double call on initial mount)
-    if (!loading) {
-      loadBooks(false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearchTerm, debouncedCategory, debouncedTag]);
-
-  const getImageUrl = (imageUrl) => {
-    if (!imageUrl) return 'https://via.placeholder.com/300x400?text=No+Image';
-    if (imageUrl.startsWith('http')) return imageUrl;
-    return `${API_BASE_URL}${imageUrl}`;
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-      </div>
+    if (term === (params.get("search") || "")) return;
+    setParams(
+      (old) => {
+        const next = new URLSearchParams(old);
+        term ? next.set("search", term) : next.delete("search");
+        next.delete("page");
+        return next;
+      },
+      { replace: true },
     );
-  }
-
+  }, [term]);
+  const query = params.toString();
+  const urlSearch = params.get("search") || "";
+  useEffect(() => setSearch(urlSearch), [urlSearch]);
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setError("");
+    bookAPI
+      .search({
+        search: params.get("search") || undefined,
+        category: category || undefined,
+        page,
+        size: 12,
+        sort,
+      })
+      .then(({ data }) => {
+        if (active) setResult(data);
+      })
+      .catch((err) => {
+        if (active) setError(err.formattedMessage);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [query, retry]);
+  const update = (key, value) =>
+    setParams((old) => {
+      const next = new URLSearchParams(old);
+      value ? next.set(key, value) : next.delete(key);
+      if (key !== "page") next.delete("page");
+      return next;
+    });
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
+    <section className="page-width section-space">
+      <div className="section-heading">
         <div>
-          <h1 className="text-3xl font-extrabold text-gray-900">Catalog</h1>
-          <p className="text-gray-500 mt-1">Discover your next favorite book</p>
+          <p className="eyebrow">Найдётся история для каждого</p>
+          <h1 className="page-title">Книжная полка</h1>
+          <p className="text-gray-500 mt-3">
+            Откройте книгу, которую захочется передать дальше.
+          </p>
         </div>
-        
-        <div className="flex items-center gap-2">
-          <div className="w-full md:w-80">
-            <SearchInput
-              value={searchTerm}
-              onChange={setSearchTerm}
-              placeholder="Search by title or author..."
-              onClear={() => setSearchTerm('')}
-            />
-          </div>
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className={`p-2 rounded-lg border transition-colors ${
-              showFilters || category || tag 
-                ? 'bg-primary-50 border-primary-200 text-primary-600' 
-                : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'
-            }`}
-          >
-            <FiFilter className="h-5 w-5" />
-          </button>
-        </div>
+        <Link to="/books/create" className="action-link secondary">
+          <FiPlus />
+          Добавить книгу
+        </Link>
       </div>
-
-      {/* Filters Panel */}
-      {(showFilters || category || tag) && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-8 animate-in fade-in slide-in-from-top-2 duration-300">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
-              <input
-                type="text"
-                placeholder="e.g. Fiction, Science..."
-                className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Tag</label>
-              <input
-                type="text"
-                placeholder="e.g. classic, mystery..."
-                className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                value={tag}
-                onChange={(e) => setTag(e.target.value)}
-              />
-            </div>
-          </div>
-          {(category || tag) && (
-            <div className="mt-4 flex justify-end">
-              <button
-                onClick={() => {
-                  setCategory('');
-                  setTag('');
-                }}
-                className="text-sm text-primary-600 hover:text-primary-700 font-medium"
-              >
-                Clear all filters
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-
-      {searching && !loading && (
-        <div className="mb-6 flex items-center text-sm text-primary-600 animate-pulse">
-          <div className="h-2 w-2 bg-primary-600 rounded-full mr-2"></div>
-          Updating results...
-        </div>
-      )}
-
-      {/* Books Grid */}
-      {books.length === 0 ? (
-        <div className="bg-white rounded-2xl border-2 border-dashed border-gray-200 py-20 text-center">
-          <p className="text-gray-400 text-lg">No books matching your criteria</p>
-          <button
-            onClick={() => {
-              setSearchTerm('');
-              setCategory('');
-              setTag('');
-            }}
-            className="mt-4 text-primary-600 font-medium hover:underline"
-          >
-            Reset all filters
+      <div className="catalog-search">
+        <FiSearch />
+        <input
+          aria-label="Название книги или автор"
+          placeholder="Название книги или автор…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        {search && (
+          <button aria-label="Очистить поиск" onClick={() => setSearch("")}>
+            <FiX />
           </button>
+        )}
+        <select
+          aria-label="Сортировка"
+          value={sort}
+          onChange={(e) => update("sort", e.target.value)}
+        >
+          <option value="addedDate,desc">Сначала новые</option>
+          <option value="title,asc">По названию</option>
+          <option value="likesCount,desc">По популярности</option>
+        </select>
+      </div>
+      <div className="category-tabs" aria-label="Жанры">
+        {categories.map((c, i) => (
+          <button
+            key={c}
+            aria-pressed={category === (i ? c : "")}
+            className={category === (i ? c : "") ? "selected" : ""}
+            onClick={() => update("category", i ? c : "")}
+          >
+            {c}
+          </button>
+        ))}
+      </div>
+      <div className="catalog-count" role="status">
+        {loading
+          ? "Ищем истории…"
+          : error
+            ? "Каталог недоступен"
+            : "Найдено книг: " + result.totalElements}
+      </div>
+      {error ? (
+        <div className="empty-panel" role="alert">
+          <h2>Не удалось загрузить книги</h2>
+          <p>{error}</p>
+          <Button onClick={() => setRetry((v) => v + 1)}>
+            Попробовать снова
+          </Button>
         </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-          {books.map((book) => (
-            <BookCard key={book.id} book={book} />
+      ) : loading ? (
+        <div className="book-grid">
+          {Array.from({ length: 8 }, (_, i) => (
+            <div key={i} className="skeleton h-96 rounded-2xl" />
           ))}
         </div>
+      ) : result.content.length ? (
+        <>
+          <div className="book-grid">
+            {result.content.map((book) => (
+              <BookCard book={book} key={book.id} />
+            ))}
+          </div>
+          {result.totalPages > 1 && (
+            <div className="pagination">
+              <Button
+                variant="outline"
+                disabled={!page}
+                onClick={() => update("page", String(page - 1))}
+              >
+                <FiArrowLeft />
+                Назад
+              </Button>
+              <span>
+                {page + 1} / {result.totalPages}
+              </span>
+              <Button
+                variant="outline"
+                disabled={page + 1 >= result.totalPages}
+                onClick={() => update("page", String(page + 1))}
+              >
+                Далее
+                <FiArrowRight />
+              </Button>
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="empty-panel">
+          <FiBookOpen />
+          <h2>Пока ни одной книги</h2>
+          <p>Попробуйте другой запрос или добавьте свою книгу.</p>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setSearch("");
+              setParams({});
+            }}
+          >
+            Сбросить фильтры
+          </Button>
+        </div>
       )}
-    </div>
+    </section>
   );
-};
-
-export default Books;
-
-
+}

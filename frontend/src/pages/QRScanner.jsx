@@ -1,130 +1,126 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Html5Qrcode } from 'html5-qrcode';
-import { qrcodeAPI } from '../services/api';
-import { FiArrowLeft } from 'react-icons/fi';
-
-const QRScanner = () => {
-  const navigate = useNavigate();
-  const [scanning, setScanning] = useState(false);
-  const [error, setError] = useState('');
-  const [html5QrCode, setHtml5QrCode] = useState(null);
-
+import React, { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Html5Qrcode } from "html5-qrcode";
+import { FiCamera, FiSearch } from "react-icons/fi";
+import { qrcodeAPI } from "../services/api";
+import { isDemo } from "../services/demoMode";
+import Button from "../components/ui/Button";
+export default function QRScanner() {
+  const navigate = useNavigate(),
+    scanner = useRef(null),
+    active = useRef(true),
+    [scanning, setScanning] = useState(false),
+    [busy, setBusy] = useState(false),
+    [error, setError] = useState(""),
+    [code, setCode] = useState("");
+  const stop = async () => {
+    if (scanner.current?.isScanning) await scanner.current.stop();
+    setScanning(false);
+  };
   useEffect(() => {
+    active.current = true;
     return () => {
-      // Cleanup: stop scanning when component unmounts
-      if (html5QrCode) {
-        html5QrCode.stop().catch(() => {});
-      }
+      active.current = false;
+      if (scanner.current?.isScanning) scanner.current.stop().catch(() => {});
     };
-  }, [html5QrCode]);
-
-  const startScanning = async () => {
+  }, []);
+  const lookup = async (value) => {
+    setBusy(true);
+    setError("");
     try {
-      setError('');
-      setScanning(true);
-
-      const qrCodeInstance = new Html5Qrcode('qr-reader');
-      setHtml5QrCode(qrCodeInstance);
-
-      await qrCodeInstance.start(
-        { facingMode: 'environment' }, // Use back camera
-        {
-          fps: 10,
-          qrbox: { width: 250, height: 250 },
+      const { data } = await qrcodeAPI.scan(value.trim());
+      if (active.current) navigate("/books/" + data.id);
+    } catch (e) {
+      if (active.current) setError(e.formattedMessage);
+    } finally {
+      if (active.current) setBusy(false);
+    }
+  };
+  const start = async () => {
+    setError("");
+    setBusy(true);
+    try {
+      scanner.current = new Html5Qrcode("qr-reader");
+      await scanner.current.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: 220 },
+        async (value) => {
+          await stop();
+          await lookup(value);
         },
-        async (decodedText) => {
-          // QR code scanned successfully
-          try {
-            await qrCodeInstance.stop();
-            setScanning(false);
-            
-            // Validate and fetch book by QR code
-            const response = await qrcodeAPI.scan(decodedText);
-            const book = response.data;
-            
-            // Navigate to book detail page
-            navigate(`/books/${book.id}`);
-          } catch (err) {
-            setError(err.response?.data?.message || 'Book not found. Invalid QR code.');
-            setScanning(false);
-            await qrCodeInstance.stop();
-          }
-        },
-        (errorMessage) => {
-          // Ignore scanning errors (just keep scanning)
-        }
+        () => {},
       );
-    } catch (err) {
-      setError('Failed to start camera. Please check permissions.');
-      setScanning(false);
-      console.error('Error starting scanner:', err);
-    }
-  };
-
-  const stopScanning = async () => {
-    if (html5QrCode) {
-      try {
-        await html5QrCode.stop();
-        setHtml5QrCode(null);
-        setScanning(false);
-        setError('');
-      } catch (err) {
-        console.error('Error stopping scanner:', err);
+      if (!active.current) {
+        await scanner.current.stop();
+        return;
       }
+      setScanning(true);
+    } catch {
+      setError(
+        "Камера недоступна. Разрешите доступ в браузере или введите код вручную. Для камеры нужен HTTPS или localhost.",
+      );
+    } finally {
+      setBusy(false);
     }
   };
-
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="mb-6">
-        <button
-          onClick={() => navigate(-1)}
-          className="flex items-center text-gray-600 hover:text-gray-900 mb-4"
-        >
-          <FiArrowLeft className="mr-2" />
-          Back
-        </button>
-        <h1 className="text-3xl font-bold text-gray-900">Scan Book QR Code</h1>
-        <p className="text-gray-600 mt-2">
-          Point your camera at a book's QR code to view book details
-        </p>
-      </div>
-
-      <div className="bg-white rounded-lg shadow-lg p-8">
-        <div id="qr-reader" className="w-full max-w-md mx-auto mb-4"></div>
-
+    <section className="page-width section-space max-w-3xl">
+      <p className="eyebrow">У каждой книги свой маршрут</p>
+      <h1 className="page-title mb-4">Паспорт истории</h1>
+      <p className="text-gray-500 mb-8">
+        Наведите камеру на QR-код BookSharing, чтобы открыть карточку книги.
+      </p>
+      <div className="panel">
+        <div id="qr-reader" className="max-w-sm mx-auto" />
+        {!scanning && (
+          <div className="empty-panel mb-6">
+            <FiCamera />
+            <h2>Знакомая книга — в один кадр</h2>
+            <p>Камера включится только после нажатия кнопки.</p>
+          </div>
+        )}
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
+          <div className="notice error" role="alert">
             {error}
           </div>
         )}
-
-        <div className="flex justify-center space-x-4 mt-6">
-          {!scanning ? (
-            <button
-              onClick={startScanning}
-              className="px-6 py-3 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors"
-            >
-              Start Scanning
-            </button>
-          ) : (
-            <button
-              onClick={stopScanning}
-              className="px-6 py-3 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
-            >
-              Stop Scanning
-            </button>
+        <div className="text-center">
+          <Button onClick={scanning ? stop : start} loading={busy}>
+            {scanning ? "Остановить камеру" : "Включить камеру"}
+          </Button>
+        </div>
+        <form
+          className="border-t mt-8 pt-6"
+          onSubmit={(e) => {
+            e.preventDefault();
+            lookup(code);
+          }}
+        >
+          <label className="field">
+            Или введите код вручную
+            <input
+              value={code}
+              required
+              maxLength={200}
+              onChange={(e) => setCode(e.target.value)}
+              placeholder={isDemo ? "BOOK-DEMO-1" : "Код с паспорта книги"}
+            />
+          </label>
+          <Button
+            type="submit"
+            variant="outline"
+            disabled={busy || !code.trim()}
+          >
+            <FiSearch className="mr-2" />
+            Найти книгу
+          </Button>
+          {isDemo && (
+            <p className="text-xs text-gray-500 mt-4">
+              Для демонстрации: BOOK-DEMO-1 … BOOK-DEMO-16.
+            </p>
           )}
-        </div>
-
-        <div className="mt-6 text-center text-sm text-gray-500">
-          <p>Make sure to grant camera permissions when prompted</p>
-        </div>
+        </form>
       </div>
-    </div>
+    </section>
   );
-};
-
-export default QRScanner;
-
+}

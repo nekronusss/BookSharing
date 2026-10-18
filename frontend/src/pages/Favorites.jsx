@@ -1,76 +1,55 @@
-import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { bookAPI } from '../services/api';
-import { FiHeart, FiSearch } from 'react-icons/fi';
-import BookCard from '../components/book/BookCard';
-import Button from '../components/ui/Button';
-
-const Favorites = () => {
-  const [books, setBooks] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    loadFavorites();
-  }, []);
-
-  const loadFavorites = async () => {
-    try {
-      const response = await bookAPI.getFavorites();
-      setBooks(response.data);
-    } catch (error) {
-      console.error('Error loading favorites:', error);
-    } finally {
-      setLoading(false);
-    }
+import React, { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { FiHeart } from "react-icons/fi";
+import { bookAPI } from "../services/api";
+import BookCard from "../components/book/BookCard";
+import Button from "../components/ui/Button";
+export default function Favorites() {
+  const [books, setBooks] = useState([]),
+    [loading, setLoading] = useState(true),
+    [error, setError] = useState("");
+  const load = () => {
+    setLoading(true);
+    setError("");
+    bookAPI
+      .getFavorites()
+      .then(({ data }) => setBooks(data))
+      .catch((e) => setError(e.formattedMessage))
+      .finally(() => setLoading(false));
   };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-      </div>
-    );
-  }
-
+  useEffect(load, []);
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-extrabold text-gray-900">My Favorites</h1>
-        <p className="text-gray-500 mt-1">Books you've marked as your favorite</p>
-      </div>
-
-      {books.length === 0 ? (
-        <div className="text-center py-20 bg-white rounded-2xl border-2 border-dashed border-gray-200">
-          <div className="bg-red-50 h-16 w-16 rounded-full flex items-center justify-center mx-auto mb-4">
-            <FiHeart className="h-8 w-8 text-red-400" />
-          </div>
-          <h3 className="text-lg font-bold text-gray-900 mb-2">Your collection is empty</h3>
-          <p className="text-gray-500 mb-8 max-w-sm mx-auto">
-            Explore our catalog and heart the books you'd like to save for later or swap.
-          </p>
-          <Button
-            onClick={() => window.location.href = '/books'}
-            variant="primary"
-          >
-            Explore Catalog
-          </Button>
+    <section className="page-width section-space">
+      <p className="eyebrow">Сохраните на потом</p>
+      <h1 className="page-title mb-4">Хочу прочитать</h1>
+      <p className="text-gray-500 mb-10">
+        Книги, которые зацепили. Ваша личная подборка.
+      </p>
+      {error ? (
+        <div className="empty-panel">
+          <p role="alert">{error}</p>
+          <Button onClick={load}>Повторить</Button>
         </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+      ) : loading ? (
+        <div className="skeleton h-80" />
+      ) : books.length ? (
+        <div className="book-grid">
           {books.map((book) => (
-            <BookCard key={book.id} book={book} />
+            <BookCard book={book} key={book.id} />
           ))}
         </div>
+      ) : (
+        <div className="empty-panel">
+          <FiHeart />
+          <h2>Здесь будут ваши находки</h2>
+          <p>
+            Нажмите «В избранное» в карточке книги, чтобы вернуться к ней позже.
+          </p>
+          <Link className="action-link" to="/books">
+            Выбрать книгу
+          </Link>
+        </div>
       )}
-    </div>
+    </section>
   );
-};
-
-export default Favorites;
-
-
-
-
-
-
-
+}

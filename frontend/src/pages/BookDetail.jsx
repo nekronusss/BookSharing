@@ -1,579 +1,328 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { bookAPI, commentAPI, ratingAPI } from '../services/api';
-import { FiStar, FiEye, FiHeart, FiTrash2, FiEdit, FiSend, FiRefreshCw } from 'react-icons/fi';
-import QRCodeDisplay from '../components/QRCodeDisplay';
-import Button from '../components/ui/Button';
-import Badge from '../components/ui/Badge';
-import ConfirmModal from '../components/ui/ConfirmModal';
-
-const BookDetail = () => {
-  const { id } = useParams();
-  const navigate = useNavigate();
-  const { user } = useAuth();
-  const [book, setBook] = useState(null);
-  const [comments, setComments] = useState([]);
-  const [newComment, setNewComment] = useState('');
-  const [avgRating, setAvgRating] = useState(0);
-  const [userScore, setUserScore] = useState(0);
-  const [pendingScore, setPendingScore] = useState(0);
-  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [isRatingSubmitting, setIsRatingSubmitting] = useState(false);
-  const [liked, setLiked] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [userRating, setUserRating] = useState(null);
-  const [editingCommentId, setEditingCommentId] = useState(null);
-  const [editingText, setEditingText] = useState('');
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [commentToDelete, setCommentToDelete] = useState(null);
-  const [isDeletingBook, setIsDeletingBook] = useState(false);
-  const [isDeletingComment, setIsDeletingComment] = useState(false);
-
-  useEffect(() => {
-    loadBook();
-    loadComments();
-  }, [id]);
-
-  const loadBook = async () => {
+import React, { useEffect, useState } from "react";
+import { Link, useParams, useNavigate } from "react-router-dom";
+import {
+  FiArrowLeft,
+  FiHeart,
+  FiStar,
+  FiEdit2,
+  FiTrash2,
+  FiArrowUpRight,
+} from "react-icons/fi";
+import { QRCodeSVG } from "qrcode.react";
+import { bookAPI, commentAPI, ratingAPI } from "../services/api";
+import { useAuth } from "../context/AuthContext";
+import BookCover from "../components/book/BookCover";
+import Button from "../components/ui/Button";
+import ConfirmModal from "../components/ui/ConfirmModal";
+export default function BookDetail() {
+  const { id } = useParams(),
+    { user } = useAuth(),
+    navigate = useNavigate();
+  const [book, setBook] = useState(null),
+    [comments, setComments] = useState([]),
+    [text, setText] = useState(""),
+    [error, setError] = useState(""),
+    [loading, setLoading] = useState(true),
+    [busy, setBusy] = useState(false),
+    [deleting, setDeleting] = useState(false),
+    [score, setScore] = useState(0);
+  const load = () => {
+    setLoading(true);
+    setError("");
+    Promise.all([bookAPI.getById(id), commentAPI.getByBook(id)])
+      .then(([b, c]) => {
+        setBook(b.data);
+        setComments(c.data);
+        setScore(b.data.userScore || 0);
+      })
+      .catch((e) => setError(e.formattedMessage))
+      .finally(() => setLoading(false));
+  };
+  useEffect(load, [id]);
+  const act = async (fn) => {
+    setBusy(true);
+    setError("");
     try {
-      const response = await bookAPI.getById(id);
-      const bookData = response.data;
-      setBook(bookData);
-      setAvgRating(bookData.rating || 0);
-      setLiked(bookData.isLikedByUser || false);
-    } catch (error) {
-      console.error('Error loading book:', error);
+      await fn();
+    } catch (e) {
+      setError(e.formattedMessage);
     } finally {
-      setLoading(false);
+      setBusy(false);
     }
   };
-
-  const loadComments = async () => {
-    try {
-      const response = await commentAPI.getByBook(id);
-      setComments(response.data);
-    } catch (error) {
-      console.error('Error loading comments:', error);
-    }
-  };
-
-  const handleDelete = async () => {
-    setIsDeletingBook(true);
-    try {
-      await bookAPI.delete(id);
-      setIsDeleteModalOpen(false);
-      navigate('/books');
-    } catch (error) {
-      alert('Error deleting book');
-    } finally {
-      setIsDeletingBook(false);
-    }
-  };
-
-  const handleAddComment = async () => {
-    if (!newComment.trim()) return;
-    try {
-      await commentAPI.create(id, newComment);
-      setNewComment('');
-      loadComments();
-    } catch (error) {
-      const message =
-        error?.response?.data?.message ||
-        (typeof error?.response?.data === 'string' ? error.response.data : null) ||
-        error?.message ||
-        'Error adding comment';
-      console.error('Error adding comment:', error?.response?.status, error?.response?.data || error);
-      alert(message);
-    }
-  };
-
-  const handleDeleteComment = async () => {
-    if (!commentToDelete) return;
-    setIsDeletingComment(true);
-    try {
-      await commentAPI.delete(commentToDelete);
-      setCommentToDelete(null);
-      loadComments();
-    } catch (error) {
-      alert('Error deleting comment');
-    } finally {
-      setIsDeletingComment(false);
-    }
-  };
-
-  const handleUpdateComment = async (commentId) => {
-    if (!editingText.trim()) return;
-    try {
-      await commentAPI.update(commentId, editingText);
-      setEditingCommentId(null);
-      setEditingText('');
-      loadComments();
-    } catch (error) {
-      alert('Error updating comment');
-    }
-  };
-
-  const handleRate = async (score, isLiked) => {
-    try {
-      // Optimistic update to make the UI react instantly.
-      setIsRatingSubmitting(true);
-      setUserScore(score);
-      const response = await ratingAPI.rate(id, score, isLiked);
-      if (response?.data?.score != null) {
-        setUserScore(response.data.score);
-      }
-      loadBook();
-    } catch (error) {
-      // Revert optimistic update if request fails.
-      setUserScore(0);
-      alert('Error rating book');
-    } finally {
-      setIsRatingSubmitting(false);
-    }
-  };
-
-  const openConfirmRating = (score) => {
-    setPendingScore(score);
-    setIsConfirmModalOpen(true);
-  };
-
-  const confirmRating = async () => {
-    if (!pendingScore) return;
-    setIsConfirmModalOpen(false);
-    await handleRate(pendingScore, liked);
-    setPendingScore(0);
-  };
-
-  const openEditRating = () => {
-    setPendingScore(userScore || 0);
-    setIsEditModalOpen(true);
-  };
-
-  const saveEditedRating = async () => {
-    if (!pendingScore) return;
-    setIsEditModalOpen(false);
-    await handleRate(pendingScore, liked);
-    setPendingScore(0);
-  };
-
-  const removeMyRating = async () => {
-    try {
-      setIsRatingSubmitting(true);
-      await ratingAPI.remove(id);
-      setUserScore(0);
-      setPendingScore(0);
-      setIsEditModalOpen(false);
-      await loadBook();
-    } catch (error) {
-      alert('Error removing rating');
-    } finally {
-      setIsRatingSubmitting(false);
-    }
-  };
-
-  const handleToggleLike = async () => {
-    if (!user) {
-      alert('Please login to like books');
-      return;
-    }
-    try {
-      const response = await bookAPI.toggleLike(id);
-      const bookData = response.data;
-      // Update the book state with the response
-      setBook(bookData);
-      setLiked(bookData.isLikedByUser || false);
-    } catch (error) {
-      console.error('Error toggling like:', error);
-      alert('Error toggling like. Please try again.');
-    }
-  };
-
-  const getImageUrl = (imageUrl) => {
-    if (!imageUrl) return 'https://via.placeholder.com/400x600?text=No+Image';
-    if (imageUrl.startsWith('http')) return imageUrl;
-    const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
-    return `${API_BASE_URL}${imageUrl}`;
-  };
-
-  if (loading) {
+  if (loading)
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      <div className="page-width section-space">
+        <div className="skeleton h-96 rounded-2xl" />
       </div>
     );
-  }
-
-  if (!book) {
+  if (!book)
     return (
-      <div className="text-center py-12">
-        <p className="text-gray-500 text-lg">Book not found</p>
+      <div className="page-width section-space empty-panel">
+        <h1 className="page-title">Книга не найдена</h1>
+        <p>{error}</p>
+        <Button onClick={load}>Повторить</Button>
+        <Link className="text-link ml-5" to="/books">
+          В каталог
+        </Link>
       </div>
     );
-  }
-
-  const isOwner = user && book.userId && user.username === book.username;
-
+  const owner = book.username === user?.username;
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="bg-white rounded-lg shadow-lg overflow-hidden">
-        <div className="md:flex">
-          <div className="md:w-1/3">
-            <img
-              src={getImageUrl(book.imageUrl)}
-              alt={book.title}
-              className="w-full h-full object-cover"
-            />
-          </div>
-          <div className="md:w-2/3 p-8">
-            <div className="flex justify-between items-start mb-4">
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">{book.title}</h1>
-                <p className="text-xl text-gray-600 mb-4">by {book.author}</p>
-              </div>
-              {isOwner && (
-                <div className="flex space-x-2">
-                  <button
-                    onClick={() => navigate(`/books/${id}/edit`)}
-                    className="p-2 text-gray-600 hover:text-primary-600"
-                  >
-                    <FiEdit className="h-5 w-5" />
-                  </button>
-                  <button
-                    onClick={() => setIsDeleteModalOpen(true)}
-                    className="p-2 text-gray-600 hover:text-red-600"
-                  >
-                    <FiTrash2 className="h-5 w-5" />
-                  </button>
-                </div>
-              )}
-            </div>
-
-            <div className="flex items-center space-x-6 mb-4">
-              <div className="flex items-center">
-                <FiStar className="text-yellow-400 mr-1" />
-                <span className="font-semibold">{avgRating?.toFixed(1) || '0.0'}</span>
-              </div>
-              <div className="flex items-center">
-                <FiEye className="mr-1" />
-                <span>{book.views || 0} views</span>
-              </div>
-              <button
-                onClick={handleToggleLike}
-                className={`flex items-center transition-colors ${
-                  liked ? 'text-red-500 hover:text-red-600' : 'text-gray-500 hover:text-red-400'
-                }`}
-              >
-                <FiHeart className={`mr-1 ${liked ? 'fill-current' : ''}`} />
-                <span>{book.likesCount || 0}</span>
-              </button>
-            </div>
-
-            {book.category && (
-              <Badge variant="primary" className="mb-4">
-                {book.category}
-              </Badge>
-            )}
-
-            <div className="mb-6">
-              <p className="text-gray-700 whitespace-pre-wrap">{book.description}</p>
-            </div>
-
-            <div className="mb-6">
-              <p className="text-sm text-gray-500">
-                <strong>Year:</strong> {book.year || 'N/A'}
-              </p>
-              {book.addedDate && (
-                <p className="text-sm text-gray-500">
-                  <strong>Added:</strong> {new Date(book.addedDate).toLocaleDateString()}
-                </p>
-              )}
-              {book.username && (
-                <p className="text-sm text-gray-500">
-                  <strong>Shared by:</strong> {book.username}
-                </p>
-              )}
-            </div>
-
-            {book.tags && book.tags.length > 0 && (
-              <div className="mb-6">
-                <div className="flex flex-wrap gap-2">
-                  {book.tags.map((tag, index) => (
-                    <span
-                      key={index}
-                      className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded"
-                    >
-                      #{tag}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {user && !isOwner && (
-              <div className="border-t pt-6 mb-6">
-                <Button
-                  onClick={() => navigate(`/exchanges/create/${book.id}`)}
-                  className="w-full py-3"
-                >
-                  <FiRefreshCw className="mr-2" />
-                  Request Exchange
-                </Button>
-              </div>
-            )}
-
-            {user && (
-              <div className="border-t pt-6">
-                <h3 className="text-lg font-semibold mb-4">Rate this book</h3>
-                <div className="flex items-center space-x-4 mb-4">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <button
-                      key={star}
-                      type="button"
-                      disabled={isRatingSubmitting || userScore > 0}
-                      onClick={() => openConfirmRating(star)}
-                      className={`text-2xl transition-colors ${
-                        star <= userScore ? 'text-yellow-400' : 'text-gray-300'
-                      } ${isRatingSubmitting || userScore > 0 ? 'cursor-not-allowed opacity-70' : 'hover:text-yellow-500'}`}
-                    >
-                      <FiStar fill={star <= userScore ? 'currentColor' : 'none'} />
-                    </button>
-                  ))}
-                </div>
-                <p className="text-sm text-gray-500">
-                  Your score: {userScore || 'not rated yet'} · Average: {avgRating?.toFixed(1) || '0.0'}
-                </p>
-
-                {userScore > 0 && (
-                  <div className="mt-4">
-                    <button
-                      type="button"
-                      onClick={openEditRating}
-                      className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-                    >
-                      Change rating
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* QR Code Section */}
-      {book.qrCode && (
-        <div className="mt-8">
-          <QRCodeDisplay bookId={book.id} qrCode={book.qrCode} title={book.title} />
+    <section className="page-width section-space">
+      <Link to="/books" className="text-link mb-8">
+        <FiArrowLeft />
+        На книжную полку
+      </Link>
+      {error && (
+        <div className="notice error" role="alert">
+          {error}
         </div>
       )}
-
-      {/* Modals */}
-      <ConfirmModal
-        isOpen={isDeleteModalOpen}
-        onClose={() => setIsDeleteModalOpen(false)}
-        onConfirm={handleDelete}
-        title="Delete Book"
-        message={`Are you sure you want to delete "${book.title}"? This action cannot be undone.`}
-        loading={isDeletingBook}
-      />
-
-      <ConfirmModal
-        isOpen={!!commentToDelete}
-        onClose={() => setCommentToDelete(null)}
-        onConfirm={handleDeleteComment}
-        title="Delete Comment"
-        message="Are you sure you want to delete this comment?"
-        loading={isDeletingComment}
-      />
-
-      {/* Comments Section */}
-      <div className="mt-8 bg-white rounded-lg shadow-lg p-8">
-        <h2 className="text-2xl font-bold mb-6">Comments</h2>
-        
-        {user && (
-          <div className="mb-6">
-            <div className="flex space-x-2">
-              <input
-                type="text"
-                placeholder="Add a comment..."
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500"
-                value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleAddComment()}
+      <div className="detail-grid">
+        <BookCover key={book.imageUrl} book={book} />
+        <div>
+          <p className="eyebrow">{book.category || "Книжная полка"}</p>
+          <h1 className="page-title">{book.title}</h1>
+          <p className="text-xl text-gray-500 mt-4">{book.author}</p>
+          <div className="metadata mt-6">
+            <span>{book.year} год</span>
+            <span>★ {Number(book.rating || 0).toFixed(1)}</span>
+            <span>{book.views || 0} просмотров</span>
+          </div>
+          <p className="detail-description">
+            {book.description || "Владелец пока не добавил описание."}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {book.tags?.map((t) => (
+              <span className="status-pill" key={t}>
+                #{t}
+              </span>
+            ))}
+          </div>
+          <div className="details-actions">
+            {owner ? (
+              <Link className="action-link" to={"/books/" + id + "/edit"}>
+                <FiEdit2 />
+                Редактировать
+              </Link>
+            ) : (
+              <Link className="action-link" to={"/exchanges/create/" + id}>
+                Предложить обмен
+                <FiArrowUpRight />
+              </Link>
+            )}
+            <Button
+              variant="outline"
+              disabled={busy}
+              onClick={() =>
+                user
+                  ? act(async () => {
+                      const { data } = await bookAPI.toggleLike(id);
+                      setBook(data);
+                    })
+                  : navigate("/login", { state: { from: "/books/" + id } })
+              }
+            >
+              <FiHeart
+                className={
+                  book.isLikedByUser ? "fill-current text-red-500" : ""
+                }
               />
-              <button
-                onClick={handleAddComment}
-                className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700"
+              <span className="ml-2">
+                {book.isLikedByUser ? "В избранном" : "В избранное"}
+              </span>
+            </Button>
+            {owner && (
+              <Button
+                aria-label="Удалить книгу"
+                variant="ghost"
+                onClick={() => setDeleting(true)}
               >
-                <FiSend />
-              </button>
+                <FiTrash2 />
+              </Button>
+            )}
+          </div>
+          <div className="panel flex items-center gap-4">
+            <div className="h-10 w-10 rounded-full bg-primary-100 flex items-center justify-center">
+              {book.username?.[0]?.toUpperCase()}
+            </div>
+            <div>
+              <p className="text-sm font-semibold">@{book.username}</p>
+              <p className="text-xs text-gray-500 mt-1">
+                {owner
+                  ? "Книга на вашей полке"
+                  : "Владелец книги · договоритесь о передаче до обмена"}
+              </p>
             </div>
           </div>
-        )}
-
-        <div className="space-y-4">
-          {comments.length === 0 ? (
-            <p className="text-gray-500">No comments yet</p>
-          ) : (
-            comments.map((comment) => (
-              <div key={comment.id} className="border-b pb-4">
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <p className="font-semibold">{comment.authorUsername || 'Anonymous'}</p>
-                    {editingCommentId === comment.id ? (
-                      <div className="mt-2">
-                        <textarea
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500"
-                          value={editingText}
-                          onChange={(e) => setEditingText(e.target.value)}
-                          rows="3"
-                        />
-                        <div className="flex space-x-2 mt-2">
-                          <button
-                            onClick={() => handleUpdateComment(comment.id)}
-                            className="px-3 py-1 bg-primary-600 text-white text-sm rounded-md hover:bg-primary-700"
-                          >
-                            Save
-                          </button>
-                          <button
-                            onClick={() => {
-                              setEditingCommentId(null);
-                              setEditingText('');
-                            }}
-                            className="px-3 py-1 bg-gray-200 text-gray-700 text-sm rounded-md hover:bg-gray-300"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        <p className="text-gray-700">{comment.text}</p>
-                        {comment.createdAt && (
-                          <p className="text-sm text-gray-500 mt-1">
-                            {new Date(comment.createdAt).toLocaleString()}
-                          </p>
-                        )}
-                      </>
-                    )}
-                  </div>
-                  {user && user.username === comment.authorUsername && editingCommentId !== comment.id && (
-                    <div className="flex space-x-2 ml-4">
-                      <button
-                        onClick={() => {
-                          setEditingCommentId(comment.id);
-                          setEditingText(comment.text);
-                        }}
-                        className="p-1 text-gray-400 hover:text-primary-600"
-                        title="Edit comment"
-                      >
-                        <FiEdit className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => setCommentToDelete(comment.id)}
-                        className="p-1 text-gray-400 hover:text-red-600"
-                        title="Delete comment"
-                      >
-                        <FiTrash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  )}
-                </div>
+          {user && (
+            <div className="mt-6">
+              <p className="text-sm mb-3">
+                {score ? "Ваша оценка: " + score : "Как вам эта книга?"}
+              </p>
+              <div className="flex gap-3">
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <button
+                    aria-label={"Оценить на " + n}
+                    disabled={busy}
+                    key={n}
+                    onClick={() =>
+                      act(async () => {
+                        await ratingAPI.rate(id, n, false);
+                        setScore(n);
+                      })
+                    }
+                  >
+                    <FiStar
+                      size={22}
+                      className={
+                        n <= score
+                          ? "fill-current text-yellow-600"
+                          : "text-gray-300"
+                      }
+                    />
+                  </button>
+                ))}
+                {score > 0 && (
+                  <button
+                    className="text-xs text-gray-500 underline"
+                    disabled={busy}
+                    onClick={() =>
+                      act(async () => {
+                        await ratingAPI.remove(id);
+                        setScore(0);
+                      })
+                    }
+                  >
+                    Убрать оценку
+                  </button>
+                )}
               </div>
-            ))
+            </div>
           )}
         </div>
       </div>
-
-      {/* Confirm Rating Modal */}
-      {isConfirmModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-md bg-white rounded-lg shadow-xl p-6">
-            <h4 className="text-lg font-semibold text-gray-900 mb-2">Confirm rating</h4>
-            <p className="text-sm text-gray-600 mb-4">
-              Are you sure you want to set <span className="font-semibold">{pendingScore}</span> star(s)?
+      <div className="grid md:grid-cols-3 gap-8 mt-12">
+        <div className="panel md:col-span-2">
+          <h2 className="text-2xl mb-6">
+            Между читателями{" "}
+            <span className="text-gray-400">({comments.length})</span>
+          </h2>
+          {user ? (
+            <form
+              className="flex gap-3 mb-6"
+              onSubmit={(e) => {
+                e.preventDefault();
+                act(async () => {
+                  await commentAPI.create(id, text.trim());
+                  setText("");
+                  const { data } = await commentAPI.getByBook(id);
+                  setComments(data);
+                });
+              }}
+            >
+              <input
+                aria-label="Ваш комментарий"
+                className="border rounded-lg px-4 py-3 w-full min-w-0 text-sm"
+                maxLength={2000}
+                required
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                placeholder="Поделитесь впечатлением…"
+              />
+              <Button type="submit" disabled={busy || !text.trim()}>
+                Отправить
+              </Button>
+            </form>
+          ) : (
+            <p className="text-sm text-gray-500 mb-6">
+              <Link to="/login" className="text-link">
+                Войдите
+              </Link>
+              , чтобы обсудить книгу.
             </p>
-
-            <div className="flex items-center justify-end space-x-3">
-              <button
-                type="button"
-                onClick={() => setIsConfirmModalOpen(false)}
-                className="px-4 py-2 text-sm rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={confirmRating}
-                disabled={isRatingSubmitting}
-                className="px-4 py-2 text-sm rounded-md bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-70"
-              >
-                Yes, set rating
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Rating Modal */}
-      {isEditModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-md bg-white rounded-lg shadow-xl p-6">
-            <h4 className="text-lg font-semibold text-gray-900 mb-2">Change rating</h4>
-            <p className="text-sm text-gray-600 mb-4">Select a new rating and save it.</p>
-
-            <div className="flex items-center space-x-3 mb-6">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <button
-                  key={star}
-                  type="button"
-                  onClick={() => setPendingScore(star)}
-                  className={`text-3xl transition-colors ${
-                    star <= pendingScore ? 'text-yellow-400' : 'text-gray-300'
-                  } hover:text-yellow-500`}
-                >
-                  <FiStar fill={star <= pendingScore ? 'currentColor' : 'none'} />
-                </button>
-              ))}
-            </div>
-
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-gray-500">New score: {pendingScore || '—'}</p>
-              <div className="flex items-center space-x-3">
-                <button
-                  type="button"
-                  onClick={removeMyRating}
-                  disabled={isRatingSubmitting}
-                  className="px-4 py-2 text-sm rounded-md border border-red-300 text-red-700 hover:bg-red-50 disabled:opacity-70"
-                >
-                  Remove rating
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsEditModalOpen(false)}
-                  className="px-4 py-2 text-sm rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50"
-                >
-                  Close
-                </button>
-                <button
-                  type="button"
-                  onClick={saveEditedRating}
-                  disabled={!pendingScore || isRatingSubmitting}
-                  className="px-4 py-2 text-sm rounded-md bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-70"
-                >
-                  Save
-                </button>
+          )}
+          {comments.length ? (
+            comments.map((c) => (
+              <div key={c.id} className="border-t py-4">
+                <div className="flex justify-between">
+                  <strong className="text-xs">@{c.authorUsername}</strong>
+                  {user?.username === c.authorUsername && (
+                    <button
+                      aria-label="Удалить комментарий"
+                      disabled={busy}
+                      onClick={() =>
+                        act(async () => {
+                          await commentAPI.delete(c.id);
+                          setComments((old) =>
+                            old.filter((item) => item.id !== c.id),
+                          );
+                        })
+                      }
+                    >
+                      <FiTrash2 size={14} />
+                    </button>
+                  )}
+                </div>
+                <p className="text-sm text-gray-600 mt-2 whitespace-pre-wrap">
+                  {c.text}
+                </p>
+                <small className="text-gray-400">
+                  {new Date(c.createdAt).toLocaleDateString("ru-RU")}
+                </small>
               </div>
-            </div>
-          </div>
+            ))
+          ) : (
+            <p className="text-sm text-gray-500">
+              Здесь пока тихо. Начните разговор о книге.
+            </p>
+          )}
         </div>
-      )}
-    </div>
+        <aside className="panel text-center">
+          <h2 className="text-2xl mb-4">Паспорт книги</h2>
+          {book.qrCode ? (
+            <>
+              <QRCodeSVG
+                value={book.qrCode}
+                size={145}
+                className="mx-auto"
+                title="QR-код книги"
+              />
+              <p className="text-xs text-gray-500 mt-4 break-all">
+                {book.qrCode}
+              </p>
+              <p className="text-xs text-gray-500 mt-3">
+                Откройте QR-сканер BookSharing, чтобы найти эту карточку.
+              </p>
+              <Button
+                variant="outline"
+                className="mt-4"
+                onClick={() => window.print()}
+              >
+                Распечатать
+              </Button>
+            </>
+          ) : (
+            <p className="text-sm text-gray-500">
+              Для этой книги QR-код ещё не создан.
+            </p>
+          )}
+        </aside>
+      </div>
+      <ConfirmModal
+        isOpen={deleting}
+        onClose={() => setDeleting(false)}
+        onConfirm={() =>
+          act(async () => {
+            await bookAPI.delete(id);
+            navigate("/profile");
+          })
+        }
+        loading={busy}
+        title="Удалить книгу?"
+        message="Карточка исчезнет с вашей полки. Это действие нельзя отменить."
+      />
+    </section>
   );
-};
-
-export default BookDetail;
-
-
+}

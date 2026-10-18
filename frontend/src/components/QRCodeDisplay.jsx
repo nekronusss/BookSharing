@@ -1,14 +1,16 @@
-import React, { useState } from 'react';
-import { QRCodeSVG } from 'qrcode.react';
-import { qrcodeAPI } from '../services/api';
-import { FiCopy, FiDownload } from 'react-icons/fi';
+import React, { useState } from "react";
+import { QRCodeSVG } from "qrcode.react";
+import { qrcodeAPI } from "../services/api";
+import { FiCopy, FiDownload } from "react-icons/fi";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
 
 const QRCodeDisplay = ({ bookId, qrCode, title }) => {
   const [copied, setCopied] = useState(false);
-  
-  const qrCodeImageUrl = bookId ? `${API_BASE_URL}/qrcode/book/${bookId}` : null;
+
+  const qrCodeImageUrl = bookId
+    ? `${API_BASE_URL}/qrcode/book/${bookId}`
+    : null;
 
   const handleDownload = async () => {
     if (bookId) {
@@ -16,7 +18,7 @@ const QRCodeDisplay = ({ bookId, qrCode, title }) => {
         const response = await qrcodeAPI.generateByBookId(bookId);
         const blob = response.data;
         const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
+        const link = document.createElement("a");
         link.href = url;
         link.download = `book-qr-${title || bookId}.png`;
         document.body.appendChild(link);
@@ -24,7 +26,7 @@ const QRCodeDisplay = ({ bookId, qrCode, title }) => {
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
       } catch (error) {
-        console.error('Error downloading QR code:', error);
+        console.error("Error downloading QR code:", error);
       }
     }
   };
@@ -40,7 +42,9 @@ const QRCodeDisplay = ({ bookId, qrCode, title }) => {
   if (!qrCode) {
     return (
       <div className="p-4 bg-gray-50 rounded-lg">
-        <p className="text-gray-500 text-sm">No QR code available for this book</p>
+        <p className="text-gray-500 text-sm">
+          No QR code available for this book
+        </p>
       </div>
     );
   }
@@ -48,7 +52,7 @@ const QRCodeDisplay = ({ bookId, qrCode, title }) => {
   return (
     <div className="p-6 bg-white rounded-lg shadow-md border border-gray-200">
       <h3 className="text-lg font-semibold mb-4">Book QR Code</h3>
-      
+
       <div className="flex flex-col items-center">
         {qrCodeImageUrl ? (
           <img
@@ -64,7 +68,9 @@ const QRCodeDisplay = ({ bookId, qrCode, title }) => {
 
         <div className="mt-4 w-full max-w-xs">
           <div className="flex items-center justify-between bg-gray-50 p-3 rounded-lg mb-3">
-            <span className="text-sm font-mono text-gray-700 truncate mr-2">{qrCode}</span>
+            <span className="text-sm font-mono text-gray-700 truncate mr-2">
+              {qrCode}
+            </span>
             <button
               onClick={handleCopyQRCode}
               className="p-2 text-gray-600 hover:text-primary-600 transition-colors"
@@ -74,7 +80,9 @@ const QRCodeDisplay = ({ bookId, qrCode, title }) => {
             </button>
           </div>
           {copied && (
-            <p className="text-sm text-green-600 text-center mb-2">QR Code copied!</p>
+            <p className="text-sm text-green-600 text-center mb-2">
+              QR Code copied!
+            </p>
           )}
 
           <div className="flex space-x-2">
@@ -97,4 +105,3 @@ const QRCodeDisplay = ({ bookId, qrCode, title }) => {
 };
 
 export default QRCodeDisplay;
-
