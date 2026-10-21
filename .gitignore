@@ -40,4 +40,5 @@ build/
 .claude/
 .junie/
 uploads/
+.local/
 **/oracleJdk-*/
