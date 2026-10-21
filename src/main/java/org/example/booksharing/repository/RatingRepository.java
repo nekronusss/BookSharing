@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 import java.util.Optional;
 
 public interface RatingRepository extends JpaRepository<Rating, Long> {
+    java.util.List<Rating> findByUserId(Long userId);
     Optional<Rating> findByBookIdAndUserUsername(Long bookId, String username);
     Optional<Rating> findByUserIdAndBookId(Long userId, Long bookId);
 

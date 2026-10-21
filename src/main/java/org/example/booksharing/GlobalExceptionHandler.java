@@ -18,6 +18,11 @@ import java.util.stream.Collectors;
 
 @ControllerAdvice
 public class GlobalExceptionHandler {
+    @ExceptionHandler(org.example.booksharing.ai.AiUnavailableException.class)
+    public ResponseEntity<ErrorResponse> handleAiUnavailable() {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(new ErrorResponse("AI_UNAVAILABLE", "AI временно недоступен. Основные функции приложения работают."));
+    }
 
     @ExceptionHandler({org.springframework.http.converter.HttpMessageNotReadableException.class,
             org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class,

@@ -97,6 +97,8 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/uploads/**", "/auth/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/ai/status", "/ai/books/*/similar").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/ai/search").permitAll()
                         .requestMatchers("/books/favorites").authenticated()
                         .requestMatchers(HttpMethod.GET, "/books/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/qrcode/**").permitAll()

@@ -1,6 +1,7 @@
 package org.example.booksharing.controller;
 
-import org.example.booksharing.entities.Book;
+import org.example.booksharing.dto.BookDto;
+import org.example.booksharing.service.UserService;
 import org.example.booksharing.service.RecommendationService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -14,11 +15,15 @@ import java.util.List;
 public class RecommendationController {
 
     private final RecommendationService service;
+    private final UserService users;
 
-    public RecommendationController(RecommendationService service) { this.service = service; }
+    public RecommendationController(RecommendationService service, UserService users) {
+        this.service = service; this.users = users;
+    }
 
     @GetMapping("/{id}/suggestions")
-    public List<Book> get(@PathVariable Long id) {
-        return service.getRecommendations(id);
+    public List<BookDto> get(@PathVariable Long id) {
+        return service.recommend(users.requireCurrentUser(id)).items().stream()
+                .map(org.example.booksharing.ai.AiDtos.Hit::book).toList();
     }
 }
