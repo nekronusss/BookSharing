@@ -68,7 +68,14 @@ async function handle(config) {
         (e.offererUsername === username && !e.offererConfirmedReceipt)),
   });
   let data;
-  if (path === "/auth/login") {
+  if (path === "/ai/status") {
+    data = { enabled: false, demo: true };
+  } else if (path.startsWith("/ai/")) {
+    fail(
+      "AI работает с реальным сервером и каталогом. В деморежиме модель не подключена.",
+      503,
+    );
+  } else if (path === "/auth/login") {
     const account = db.users.find((u) => u.username === body.username);
     if (!account || body.password !== "demo123")
       fail("Для демо используйте alina или mark и пароль demo123", 401);

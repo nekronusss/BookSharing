@@ -2,7 +2,7 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { FiArrowUpRight, FiHeart, FiStar } from "react-icons/fi";
 import BookCover from "./BookCover";
-export default function BookCard({ book }) {
+export default function BookCard({ book, explanation }) {
   return (
     <Link to={"/books/" + book.id} className="book-card">
       <BookCover book={book} />
@@ -13,6 +13,7 @@ export default function BookCard({ book }) {
         </div>
         <h3>{book.title}</h3>
         <p>{book.author}</p>
+        {explanation && <p className="ai-explanation">{explanation}</p>}
         <div className="book-card-meta">
           <span>{book.username ? "@" + book.username : "Сообщество"}</span>
           <span>

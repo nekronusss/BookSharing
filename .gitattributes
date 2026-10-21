@@ -1,2 +1,7 @@
 /mvnw text eol=lf
 *.cmd text eol=crlf
+/frontend/**/*.js text eol=lf
+/frontend/**/*.jsx text eol=lf
+/frontend/**/*.css text eol=lf
+/frontend/**/*.html text eol=lf
+/frontend/**/*.json text eol=lf

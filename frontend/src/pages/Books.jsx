@@ -12,6 +12,7 @@ import { bookAPI } from "../services/api";
 import BookCard from "../components/book/BookCard";
 import Button from "../components/ui/Button";
 import { useDebounce } from "../hooks/useDebounce";
+import AiSearch from "../components/ai/AiSearch";
 const categories = [
   "Все книги",
   "Классика",
@@ -23,6 +24,7 @@ const categories = [
 ];
 export default function Books() {
   const [params, setParams] = useSearchParams();
+  const aiMode = params.get("mode") === "ai";
   const [search, setSearch] = useState(params.get("search") || "");
   const term = useDebounce(search, 350),
     category = params.get("category") || "",
@@ -52,6 +54,7 @@ export default function Books() {
   const urlSearch = params.get("search") || "";
   useEffect(() => setSearch(urlSearch), [urlSearch]);
   useEffect(() => {
+    if (aiMode) return;
     let active = true;
     setLoading(true);
     setError("");
@@ -98,29 +101,47 @@ export default function Books() {
           Добавить книгу
         </Link>
       </div>
-      <div className="catalog-search">
-        <FiSearch />
-        <input
-          aria-label="Название книги или автор"
-          placeholder="Название книги или автор…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        {search && (
-          <button aria-label="Очистить поиск" onClick={() => setSearch("")}>
-            <FiX />
-          </button>
-        )}
-        <select
-          aria-label="Сортировка"
-          value={sort}
-          onChange={(e) => update("sort", e.target.value)}
+      <div className="category-tabs" aria-label="Режим поиска">
+        <button
+          className={!aiMode ? "selected" : ""}
+          aria-pressed={!aiMode}
+          onClick={() => update("mode", "")}
         >
-          <option value="addedDate,desc">Сначала новые</option>
-          <option value="title,asc">По названию</option>
-          <option value="likesCount,desc">По популярности</option>
-        </select>
+          Обычный поиск
+        </button>
+        <button
+          className={aiMode ? "selected" : ""}
+          aria-pressed={aiMode}
+          onClick={() => update("mode", "ai")}
+        >
+          AI-поиск
+        </button>
       </div>
+      {!aiMode && (
+        <div className="catalog-search">
+          <FiSearch />
+          <input
+            aria-label="Название книги или автор"
+            placeholder="Название книги или автор…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          {search && (
+            <button aria-label="Очистить поиск" onClick={() => setSearch("")}>
+              <FiX />
+            </button>
+          )}
+          <select
+            aria-label="Сортировка"
+            value={sort}
+            onChange={(e) => update("sort", e.target.value)}
+          >
+            <option value="addedDate,desc">Сначала новые</option>
+            <option value="title,asc">По названию</option>
+            <option value="likesCount,desc">По популярности</option>
+          </select>
+        </div>
+      )}
       <div className="category-tabs" aria-label="Жанры">
         {categories.map((c, i) => (
           <button
@@ -133,73 +154,79 @@ export default function Books() {
           </button>
         ))}
       </div>
-      <div className="catalog-count" role="status">
-        {loading
-          ? "Ищем истории…"
-          : error
-            ? "Каталог недоступен"
-            : "Найдено книг: " + result.totalElements}
-      </div>
-      {error ? (
-        <div className="empty-panel" role="alert">
-          <h2>Не удалось загрузить книги</h2>
-          <p>{error}</p>
-          <Button onClick={() => setRetry((v) => v + 1)}>
-            Попробовать снова
-          </Button>
-        </div>
-      ) : loading ? (
-        <div className="book-grid">
-          {Array.from({ length: 8 }, (_, i) => (
-            <div key={i} className="skeleton h-96 rounded-2xl" />
-          ))}
-        </div>
-      ) : result.content.length ? (
+      {aiMode ? (
+        <AiSearch category={category} />
+      ) : (
         <>
-          <div className="book-grid">
-            {result.content.map((book) => (
-              <BookCard book={book} key={book.id} />
-            ))}
+          <div className="catalog-count" role="status">
+            {loading
+              ? "Ищем истории…"
+              : error
+                ? "Каталог недоступен"
+                : "Найдено книг: " + result.totalElements}
           </div>
-          {result.totalPages > 1 && (
-            <div className="pagination">
-              <Button
-                variant="outline"
-                disabled={!page}
-                onClick={() => update("page", String(page - 1))}
-              >
-                <FiArrowLeft />
-                Назад
+          {error ? (
+            <div className="empty-panel" role="alert">
+              <h2>Не удалось загрузить книги</h2>
+              <p>{error}</p>
+              <Button onClick={() => setRetry((v) => v + 1)}>
+                Попробовать снова
               </Button>
-              <span>
-                {page + 1} / {result.totalPages}
-              </span>
+            </div>
+          ) : loading ? (
+            <div className="book-grid">
+              {Array.from({ length: 8 }, (_, i) => (
+                <div key={i} className="skeleton h-96 rounded-2xl" />
+              ))}
+            </div>
+          ) : result.content.length ? (
+            <>
+              <div className="book-grid">
+                {result.content.map((book) => (
+                  <BookCard book={book} key={book.id} />
+                ))}
+              </div>
+              {result.totalPages > 1 && (
+                <div className="pagination">
+                  <Button
+                    variant="outline"
+                    disabled={!page}
+                    onClick={() => update("page", String(page - 1))}
+                  >
+                    <FiArrowLeft />
+                    Назад
+                  </Button>
+                  <span>
+                    {page + 1} / {result.totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    disabled={page + 1 >= result.totalPages}
+                    onClick={() => update("page", String(page + 1))}
+                  >
+                    Далее
+                    <FiArrowRight />
+                  </Button>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="empty-panel">
+              <FiBookOpen />
+              <h2>Пока ни одной книги</h2>
+              <p>Попробуйте другой запрос или добавьте свою книгу.</p>
               <Button
                 variant="outline"
-                disabled={page + 1 >= result.totalPages}
-                onClick={() => update("page", String(page + 1))}
+                onClick={() => {
+                  setSearch("");
+                  setParams({});
+                }}
               >
-                Далее
-                <FiArrowRight />
+                Сбросить фильтры
               </Button>
             </div>
           )}
         </>
-      ) : (
-        <div className="empty-panel">
-          <FiBookOpen />
-          <h2>Пока ни одной книги</h2>
-          <p>Попробуйте другой запрос или добавьте свою книгу.</p>
-          <Button
-            variant="outline"
-            onClick={() => {
-              setSearch("");
-              setParams({});
-            }}
-          >
-            Сбросить фильтры
-          </Button>
-        </div>
       )}
     </section>
   );

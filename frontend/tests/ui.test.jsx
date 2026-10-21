@@ -2,7 +2,13 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import React from "react";
 import TestRenderer, { act } from "react-test-renderer";
-import { MemoryRouter, Routes, Route } from "react-router-dom";
+import {
+  MemoryRouter,
+  Routes,
+  Route,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
 
 const storage = new Map([
   ["booksharing-demo", "1"],
@@ -41,10 +47,7 @@ let tree;
 async function mount(path, pattern, Component, privatePage = false) {
   await act(async () => {
     tree = TestRenderer.create(
-      <MemoryRouter
-        initialEntries={[path]}
-        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
-      >
+      <MemoryRouter initialEntries={[path]}>
         <AuthProvider>
           <Routes>
             <Route
@@ -140,4 +143,50 @@ test("exchange acceptance reveals the shipment action", async () => {
     await wait(200);
   });
   assert.match(content(), /Книга передана \/ отправлена/);
+});
+
+test("protected routes preserve the return URL and replace the login redirect", async () => {
+  storage.delete("demo-token");
+  storage.delete("demo-user");
+  function LoginProbe() {
+    const location = useLocation();
+    const navigate = useNavigate();
+    return (
+      <div>
+        <p>{location.state?.from}</p>
+        <button onClick={() => navigate(-1)}>Back</button>
+      </div>
+    );
+  }
+  try {
+    await act(async () => {
+      tree = TestRenderer.create(
+        <MemoryRouter
+          initialEntries={["/", "/profile?section=books"]}
+          initialIndex={1}
+        >
+          <AuthProvider>
+            <Routes>
+              <Route path="/" element={<p>Public home</p>} />
+              <Route
+                path="/profile"
+                element={
+                  <PrivateRoute>
+                    <p>Private profile</p>
+                  </PrivateRoute>
+                }
+              />
+              <Route path="/login" element={<LoginProbe />} />
+            </Routes>
+          </AuthProvider>
+        </MemoryRouter>,
+      );
+    });
+    assert.match(content(), /\/profile\?section=books/);
+    assert.doesNotMatch(content(), /Private profile/);
+    await act(async () => button("Back").props.onClick());
+    assert.match(content(), /Public home/);
+  } finally {
+    storage.set("demo-token", "demo:alina");
+  }
 });

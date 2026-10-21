@@ -14,6 +14,7 @@ import { useAuth } from "../context/AuthContext";
 import BookCover from "../components/book/BookCover";
 import Button from "../components/ui/Button";
 import ConfirmModal from "../components/ui/ConfirmModal";
+import SimilarBooks from "../components/ai/SimilarBooks";
 export default function BookDetail() {
   const { id } = useParams(),
     { user } = useAuth(),
@@ -310,6 +311,7 @@ export default function BookDetail() {
           )}
         </aside>
       </div>
+      {book.isPublic !== false && <SimilarBooks id={id} />}
       <ConfirmModal
         isOpen={deleting}
         onClose={() => setDeleting(false)}

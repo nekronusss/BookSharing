@@ -10,6 +10,7 @@ export default function Navbar() {
   useEffect(() => setOpen(false), [location.pathname]);
   const links = [
     ["/books", "Каталог"],
+    ["/ai", "AI-помощник"],
     ...(user
       ? [
           ["/favorites", "Избранное"],

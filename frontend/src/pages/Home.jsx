@@ -11,6 +11,7 @@ import {
 import { bookAPI } from "../services/api";
 import BookCard from "../components/book/BookCard";
 import { useAuth } from "../context/AuthContext";
+import Recommendations from "../components/ai/Recommendations";
 export default function Home() {
   const { user } = useAuth();
   const [books, setBooks] = useState([]),
@@ -172,6 +173,7 @@ export default function Home() {
           </div>
         )}
       </section>
+      {user && <Recommendations key={user.id || user.username} />}
       <section id="how-it-works" className="how-section">
         <div className="page-width section-space">
           <div className="section-heading">

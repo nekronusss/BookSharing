@@ -1,64 +1,78 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-:root {
-  font-family: Inter, "Segoe UI", Arial, sans-serif;
-  color: #25372e;
-  background: #f8f7f2;
-  font-synthesis: none;
-}
-* {
-  box-sizing: border-box;
-}
-body {
-  margin: 0;
-}
-button,
-input,
-select,
-textarea {
-  font: inherit;
-}
-button,
-a,
-input,
-textarea,
-select {
-  -webkit-tap-highlight-color: transparent;
-}
-button {
-  cursor: pointer;
-}
-button:disabled {
-  cursor: not-allowed;
-}
-a,
-button {
-  transition:
-    background 0.2s,
-    color 0.2s,
-    transform 0.2s;
-}
-a:focus-visible,
-button:focus-visible,
-input:focus-visible,
-textarea:focus-visible,
-select:focus-visible {
-  outline: 3px solid #ba7950;
-  outline-offset: 4px;
-}
-::selection {
-  background: #d8e4ca;
-}
-h1,
-h2,
-h3,
-p {
-  overflow-wrap: anywhere;
-}
-html {
-  scroll-behavior: smooth;
-  scroll-padding-top: 110px;
+@import "tailwindcss";
+@config "../tailwind.config.js";
+
+/* Preserve the v3 base colors while using the v4 compiler and utilities. */
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentColor);
+  }
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--color-gray-400);
+  }
+  :root {
+    font-family: Inter, "Segoe UI", Arial, sans-serif;
+    color: #25372e;
+    background: #f8f7f2;
+    font-synthesis: none;
+  }
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    margin: 0;
+  }
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+  button,
+  a,
+  input,
+  textarea,
+  select {
+    -webkit-tap-highlight-color: transparent;
+  }
+  button {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: not-allowed;
+  }
+  a,
+  button {
+    transition:
+      background 0.2s,
+      color 0.2s,
+      transform 0.2s;
+  }
+  a:focus-visible,
+  button:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible {
+    outline: 3px solid #ba7950;
+    outline-offset: 4px;
+  }
+  ::selection {
+    background: #d8e4ca;
+  }
+  h1,
+  h2,
+  h3,
+  p {
+    overflow-wrap: anywhere;
+  }
+  html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 110px;
+  }
 }
 .page-width {
   width: calc(100% - 80px);
@@ -1245,5 +1259,118 @@ h2,
   *:after {
     animation: none !important;
     transition: none !important;
+  }
+}
+/* AI features share the existing catalog cards and palette. */
+.ai-panel {
+  background: #f5f4ee;
+  border: 1px solid #dedfd4;
+  border-radius: 18px;
+  padding: 24px;
+  margin-block: 20px;
+}
+.ai-panel summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.ai-note {
+  color: #62695f;
+  font-size: 13px;
+  line-height: 1.7;
+  margin-block: 12px;
+}
+.book-card-body .ai-explanation {
+  color: #475c42;
+  font-size: 12px;
+  line-height: 1.65;
+  margin-top: 12px;
+  white-space: normal;
+}
+.ai-genres,
+.ai-prompts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-block: 18px;
+}
+.ai-genres label,
+.ai-prompts button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #d1d9cb;
+  border-radius: 24px;
+  padding: 9px 14px;
+  font-size: 13px;
+  background: #fff;
+  cursor: pointer;
+}
+.ai-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.ai-check input {
+  flex-shrink: 0;
+}
+.ai-draft {
+  border-top: 1px solid #d1d9cb;
+  margin-top: 18px;
+  padding-top: 18px;
+}
+.ai-draft h3 {
+  margin-bottom: 12px;
+  font-weight: 600;
+}
+.ai-compose-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.ai-messages {
+  max-height: 65vh;
+  overflow-y: auto;
+  padding: 6px;
+}
+.ai-message {
+  padding: 20px;
+  border: 1px solid #e0e4da;
+  border-radius: 16px;
+  margin-block: 16px;
+  background: #fff;
+}
+.ai-message > strong {
+  display: block;
+  font-size: 12px;
+  color: #64775b;
+  margin-bottom: 10px;
+}
+.ai-message.user {
+  margin-left: 15%;
+  background: #eef3e8;
+}
+.ai-message .book-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.ai-welcome {
+  padding: 48px 20px;
+  text-align: center;
+  color: #62695f;
+}
+.ai-welcome h2 {
+  font-size: 28px;
+  margin-bottom: 12px;
+}
+@media (max-width: 600px) {
+  .ai-panel,
+  .ai-message {
+    padding: 16px;
+  }
+  .ai-message .book-grid {
+    grid-template-columns: 1fr;
   }
 }

@@ -34,6 +34,7 @@ const Exchanges = lazy(() => import("./pages/Exchanges"));
 const ExchangeDetail = lazy(() => import("./pages/ExchangeDetail"));
 const CreateExchange = lazy(() => import("./pages/CreateExchange"));
 const QRScanner = lazy(() => import("./pages/QRScanner"));
+const AiAssistant = lazy(() => import("./pages/AiAssistant"));
 
 const Loading = () => (
   <div className="flex items-center justify-center min-h-screen">
@@ -58,6 +59,14 @@ function App() {
                 <Routes>
                   <Route path="/" element={<Home />} />
                   <Route path="/guide" element={<Guide />} />
+                  <Route
+                    path="/ai"
+                    element={
+                      <PrivateRoute>
+                        <AiAssistant />
+                      </PrivateRoute>
+                    }
+                  />
                   <Route
                     path="/books/:id/edit"
                     element={

@@ -66,6 +66,22 @@ export const authAPI = {
     api.post("/auth/login", { username, password }),
 };
 
+// Chat may perform retrieval and generation sequentially. Backend bounds each provider call.
+const aiOptions = { timeout: 250000 };
+export const aiAPI = {
+  status: () => api.get("/ai/status"),
+  search: (query, category = "") =>
+    api.post("/ai/search", { query, category }, aiOptions),
+  recommendations: () => api.get("/ai/recommendations"),
+  preferences: () => api.get("/ai/preferences"),
+  savePreferences: (values) => api.put("/ai/preferences", values),
+  chat: (message, history, usePreferences) =>
+    api.post("/ai/chat", { message, history, usePreferences }, aiOptions),
+  similar: (id) => api.get(`/ai/books/${id}/similar`),
+  describe: (values) =>
+    api.post("/ai/books/description-suggestion", values, aiOptions),
+};
+
 export const bookAPI = {
   getAll: (params = {}) => api.get("/books", { params }),
   getById: (id) => api.get(`/books/${id}`),

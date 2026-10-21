@@ -6,6 +6,7 @@ import { isDemo } from "../services/demoMode";
 import { useAuth } from "../context/AuthContext";
 import BookCover from "../components/book/BookCover";
 import Button from "../components/ui/Button";
+import DescriptionAssistant from "../components/ai/DescriptionAssistant";
 export default function CreateBook() {
   const { id } = useParams(),
     navigate = useNavigate(),
@@ -162,6 +163,9 @@ export default function CreateBook() {
                     "Классика",
                     "Художественная литература",
                     "Фантастика",
+                    "Фэнтези",
+                    "Психология",
+                    "Детективы",
                     "Нон-фикшн",
                     "Наука",
                     "Детские книги",
@@ -183,11 +187,22 @@ export default function CreateBook() {
                 placeholder="Чем вам запомнилась книга? Есть ли пометки или повреждения?"
               />
             </label>
+            <DescriptionAssistant
+              form={form}
+              onApply={(draft) =>
+                setForm((current) => ({
+                  ...current,
+                  description: draft.description,
+                  category: draft.category,
+                  tags: draft.tags.join(", "),
+                }))
+              }
+            />
             <label className="field">
               Теги через запятую
               <input
                 name="tags"
-                maxLength={300}
+                maxLength={778}
                 value={form.tags}
                 onChange={change}
                 placeholder="приключения, дружба, для подростков"
